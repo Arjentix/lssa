@@ -78,7 +78,7 @@ impl NullifierSparseMerkleTree {
         let is_member = self.search_item_inclusion(nullifier_hash)?;
 
         if is_member {
-            Err(monotree::Errors::new("Is a memeber"))
+            Err(monotree::Errors::new("Is a member"))
         } else {
             Ok((
                 self.tree
