@@ -92,6 +92,14 @@ mod tests {
     }
 
     #[test]
+    fn test_mempool_new() {
+        let pool: MemPool<TestItem> = MemPool::new();
+        assert!(pool.is_empty());
+        assert_eq!(pool.len(), 0);
+    }
+
+
+    #[test]
     fn test_push_pop() {
         let mut mempool: MemPool<TestItem> = MemPool::new();
 
