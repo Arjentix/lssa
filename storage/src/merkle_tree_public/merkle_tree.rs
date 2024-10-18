@@ -165,4 +165,18 @@ mod tests {
         assert_eq!(tree.leaves.len(), 2);
         assert_eq!(tree.get_tx(tx2.hash()), Some(&tx2));
     }
+
+    #[test]
+    fn test_add_tx_multiple() {
+        let tx1 = MockTransaction { hash: get_first_32_bytes("tx1") };
+        let tx2 = MockTransaction { hash: get_first_32_bytes("tx2") };
+        let tx3 = MockTransaction { hash: get_first_32_bytes("tx3") };
+
+        let mut tree = HashStorageMerkleTree::new(vec![tx1.clone()]);
+        tree.add_tx_multiple(vec![tx2.clone(), tx3.clone()]);
+
+        assert_eq!(tree.leaves.len(), 3);
+        assert_eq!(tree.get_tx(tx2.hash()), Some(&tx2));
+        assert_eq!(tree.get_tx(tx3.hash()), Some(&tx3));
+    }
 }
