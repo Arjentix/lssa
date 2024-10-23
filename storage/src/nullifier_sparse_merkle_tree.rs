@@ -238,10 +238,7 @@ mod tests {
     #[test]
     fn test_insert_and_get_proofs_of_existing_items() {
         let mut tree = NullifierSparseMerkleTree::new();
-        let nullifiers = vec![
-            create_nullifier([1u8; 32]),
-            create_nullifier([2u8; 32]),
-        ];
+        let nullifiers = vec![create_nullifier([1u8; 32]), create_nullifier([2u8; 32])];
 
         tree.insert_items(nullifiers).unwrap();
 
