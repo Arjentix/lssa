@@ -132,4 +132,10 @@ mod tests {
     fn create_nullifier(hash: TreeHashType) -> UTXONullifier {
         UTXONullifier { utxo_hash: hash }
     }
+
+    #[test]
+    fn test_new_tree_initialization() {
+        let tree = NullifierSparseMerkleTree::new();
+        assert!(tree.curr_root.is_none());
+    }
 }
