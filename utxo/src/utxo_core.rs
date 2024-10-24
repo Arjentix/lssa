@@ -95,5 +95,20 @@ mod tests {
         assert!(utxo.nullifier.is_none());
     }
 
+    #[test]
+    fn test_consume_utxo() {
+        let payload = sample_payload();
+        let mut utxo = UTXO::create_utxo_from_payload(payload);
+
+        let nullifier = sample_nullifier();
+
+        // First consumption should succeed
+        assert!(utxo.consume_utxo(nullifier.clone()).is_ok());
+        assert_eq!(utxo.nullifier, Some(nullifier));
+
+        // Second consumption should fail
+        let result = utxo.consume_utxo(sample_nullifier());
+        assert!(result.is_err());
+    }
 
 }
