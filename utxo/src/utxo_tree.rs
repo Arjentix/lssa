@@ -146,4 +146,19 @@ mod tests {
         assert_eq!(retrieved_utxo.unwrap().hash, utxo.hash);
     }
 
+    #[test]
+    fn test_get_item_not_exists() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo = sample_utxo();
+
+        // Insert one UTXO and try to fetch a different hash
+        smt.insert_item(utxo).unwrap();
+
+        let non_existent_hash = TreeHashType::default();
+        let result = smt.get_item(non_existent_hash).unwrap();
+
+        // Test that retrieval for a non-existent UTXO returns None
+        assert!(result.is_none());
+    }
+
 }
