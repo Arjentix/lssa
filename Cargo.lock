@@ -9,6 +9,7 @@ dependencies = [
  "anyhow",
  "elliptic-curve",
  "env_logger",
+ "hex",
  "k256",
  "log",
  "rand 0.8.5",

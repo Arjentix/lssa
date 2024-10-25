@@ -194,3 +194,42 @@ impl AddressKeyHolder {
         EphemeralKeyHolder::new_os_random()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn key_generation_test() {
+        let seed_holder = SeedHolder::new_os_random();
+        let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
+
+        let utxo_secret_key_holder = top_secret_key_holder.produce_utxo_secret_holder();
+
+        let address = utxo_secret_key_holder.generate_address();
+        let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
+        let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
+
+        println!("======Prerequisites======");
+        println!();
+
+        println!("Group generator {:?}", hex::encode(AffinePoint::GENERATOR.to_bytes()));
+        println!("Nullifier constant {:?}", hex::encode(NULLIFIER_SECRET_CONST));
+        println!("Viewing constatnt {:?}", hex::encode(VIEVING_SECRET_CONST));
+        println!();
+
+        println!("======Holders======");
+        println!();
+
+        println!("{seed_holder:?}");
+        println!("{top_secret_key_holder:?}");
+        println!("{utxo_secret_key_holder:?}");
+        println!();
+
+        println!("======Public data======");
+        println!();
+        println!("Address{:?}", hex::encode(address));
+        println!("Nulifier public key {:?}", hex::encode(nullifer_public_key.to_bytes()));
+        println!("Viewing public key {:?}", hex::encode(viewing_public_key.to_bytes()));
+    }
+}
