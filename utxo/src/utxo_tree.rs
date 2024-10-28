@@ -72,3 +72,118 @@ impl Default for UTXOSparseMerkleTree {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::utxo_core::{UTXOPayload, UTXO};
+    use storage::{merkle_tree_public::TreeHashType, AccountId};
+
+    fn sample_utxo_payload() -> UTXOPayload {
+        UTXOPayload {
+            owner: AccountId::default(),
+            asset: vec![1, 2, 3],
+        }
+    }
+
+    fn sample_utxo() -> UTXO {
+        UTXO::create_utxo_from_payload(sample_utxo_payload())
+    }
+
+    #[test]
+    fn test_utxo_sparse_merkle_tree_new() {
+        let smt = UTXOSparseMerkleTree::new();
+        assert!(smt.curr_root.is_none());
+        assert_eq!(smt.store.len(), 0);
+    }
+
+    #[test]
+    fn test_insert_item() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo = sample_utxo();
+
+        let result = smt.insert_item(utxo.clone());
+
+        // Test insertion is successful
+        assert!(result.is_ok());
+
+        // Test UTXO is now stored in the tree
+        assert_eq!(smt.store.get(&utxo.hash).unwrap().hash, utxo.hash);
+
+        // Test curr_root is updated
+        assert!(smt.curr_root.is_some());
+    }
+
+    #[test]
+    fn test_insert_items() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo1 = sample_utxo();
+        let utxo2 = sample_utxo();
+
+        let result = smt.insert_items(vec![utxo1.clone(), utxo2.clone()]);
+
+        // Test insertion of multiple items is successful
+        assert!(result.is_ok());
+
+        // Test UTXOs are now stored in the tree
+        assert!(smt.store.get(&utxo1.hash).is_some());
+        assert!(smt.store.get(&utxo2.hash).is_some());
+
+        // Test curr_root is updated
+        assert!(smt.curr_root.is_some());
+    }
+
+    #[test]
+    fn test_get_item_exists() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo = sample_utxo();
+
+        smt.insert_item(utxo.clone()).unwrap();
+
+        // Test that the UTXO can be retrieved by hash
+        let retrieved_utxo = smt.get_item(utxo.hash).unwrap();
+        assert!(retrieved_utxo.is_some());
+        assert_eq!(retrieved_utxo.unwrap().hash, utxo.hash);
+    }
+
+    #[test]
+    fn test_get_item_not_exists() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo = sample_utxo();
+
+        // Insert one UTXO and try to fetch a different hash
+        smt.insert_item(utxo).unwrap();
+
+        let non_existent_hash = TreeHashType::default();
+        let result = smt.get_item(non_existent_hash).unwrap();
+
+        // Test that retrieval for a non-existent UTXO returns None
+        assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_get_membership_proof() {
+        let mut smt = UTXOSparseMerkleTree::new();
+        let utxo = sample_utxo();
+
+        smt.insert_item(utxo.clone()).unwrap();
+
+        // Fetch membership proof for the inserted UTXO
+        let proof = smt.get_membership_proof(utxo.hash).unwrap();
+
+        // Test proof is generated successfully
+        assert!(proof.is_some());
+    }
+
+    #[test]
+    fn test_get_membership_proof_not_exists() {
+        let mut smt = UTXOSparseMerkleTree::new();
+
+        // Try fetching proof for a non-existent UTXO hash
+        let non_existent_hash = TreeHashType::default();
+        let proof = smt.get_membership_proof(non_existent_hash).unwrap();
+
+        // Test no proof is generated for a non-existent UTXO
+        assert!(proof.is_none());
+    }
+}

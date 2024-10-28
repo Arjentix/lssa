@@ -6,7 +6,7 @@ use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, Accoun
 ///Raw asset data
 pub type Asset = Vec<u8>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 ///Container for raw utxo payload
 pub struct UTXO {
     pub hash: TreeHashType,
@@ -51,5 +51,95 @@ impl UTXO {
 
     pub fn interpret_asset<'de, ToInterpret: Deserialize<'de>>(&'de self) -> Result<ToInterpret> {
         Ok(serde_json::from_slice(&self.asset)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, AccountId};
+
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct TestAsset {
+        id: u32,
+        name: String,
+    }
+
+    fn sample_account() -> AccountId {
+        AccountId::default()
+    }
+
+    fn sample_nullifier() -> UTXONullifier {
+        UTXONullifier::default()
+    }
+
+    fn sample_tree_hash() -> TreeHashType {
+        TreeHashType::default()
+    }
+
+    fn sample_payload() -> UTXOPayload {
+        UTXOPayload {
+            owner: sample_account(),
+            asset: serde_json::to_vec(&TestAsset {
+                id: 1,
+                name: "Test".to_string(),
+            })
+            .unwrap(),
+        }
+    }
+
+    #[test]
+    fn test_create_utxo_from_payload() {
+        let payload = sample_payload();
+        let utxo = UTXO::create_utxo_from_payload(payload.clone());
+
+        // Ensure hash is created and the UTXO fields are correctly assigned
+        assert_eq!(utxo.owner, payload.owner);
+        assert_eq!(utxo.asset, payload.asset);
+        assert!(utxo.nullifier.is_none());
+    }
+
+    #[test]
+    fn test_consume_utxo() {
+        let payload = sample_payload();
+        let mut utxo = UTXO::create_utxo_from_payload(payload);
+
+        let nullifier = sample_nullifier();
+
+        // First consumption should succeed
+        assert!(utxo.consume_utxo(nullifier.clone()).is_ok());
+        assert_eq!(utxo.nullifier, Some(nullifier));
+
+        // Second consumption should fail
+        let result = utxo.consume_utxo(sample_nullifier());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_interpret_asset() {
+        let payload = sample_payload();
+        let utxo = UTXO::create_utxo_from_payload(payload);
+
+        // Interpret asset as TestAsset
+        let interpreted: TestAsset = utxo.interpret_asset().unwrap();
+
+        assert_eq!(
+            interpreted,
+            TestAsset {
+                id: 1,
+                name: "Test".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn test_interpret_invalid_asset() {
+        let mut payload = sample_payload();
+        payload.asset = vec![0, 1, 2, 3]; // Invalid data for deserialization
+        let utxo = UTXO::create_utxo_from_payload(payload);
+
+        // This should fail because the asset is not valid JSON for TestAsset
+        let result: Result<TestAsset> = utxo.interpret_asset();
+        assert!(result.is_err());
     }
 }
