@@ -62,13 +62,14 @@ impl AddressKeyHolder {
         nonce: Nonce,
     ) -> Vec<u8> {
         let key_point = self.calculate_shared_secret_receiver(ephemeral_public_key_sender);
-        let key_raw = key_point.to_bytes();
-        let key_raw_adjust: [u8; 32] = key_raw.as_slice().try_into().unwrap();
-
+        let binding = key_point.to_bytes();
+        let key_raw = &binding.as_slice()[..32];
+        let key_raw_adjust: [u8; 32] = key_raw.try_into().unwrap();
+        
         let key: Key<Aes256Gcm> = key_raw_adjust.into();
-
+        
         let cipher = Aes256Gcm::new(&key);
-
+        
         cipher.decrypt(&nonce, ciphertext.as_slice()).unwrap()
     }
 }
