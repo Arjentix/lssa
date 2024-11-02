@@ -152,6 +152,20 @@ mod tests {
     }
 
     #[test]
+    fn test_calculate_shared_secret_with_identity_point() {
+        let address_key_holder = AddressKeyHolder::new_os_random();
+
+        // Use identity point as ephemeral public key
+        let identity_point = AffinePoint::identity();
+
+        // Calculate shared secret
+        let shared_secret = address_key_holder.calculate_shared_secret_receiver(identity_point);
+
+        // The shared secret with the identity point should also result in the identity point
+        assert!(Into::<bool>::into(shared_secret.is_identity()));
+    }
+
+    #[test]
     fn key_generation_test() {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
