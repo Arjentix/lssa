@@ -141,6 +141,17 @@ mod tests {
     }
 
     #[test]
+    fn test_new_os_random_initialization() {
+        // Ensure that AddressKeyHolder is initialized correctly
+        let address_key_holder = AddressKeyHolder::new_os_random();
+
+        // Check that key holder fields are initialized with expected types and values
+        assert!(!Into::<bool>::into(address_key_holder.nullifer_public_key.is_identity()));
+        assert!(!Into::<bool>::into(address_key_holder.viewing_public_key.is_identity()));
+        assert!(address_key_holder.address.as_slice().len() > 0); // Assume TreeHashType has non-zero length for a valid address
+    }
+
+    #[test]
     fn key_generation_test() {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
