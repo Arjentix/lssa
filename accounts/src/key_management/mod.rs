@@ -96,6 +96,21 @@ mod tests {
     }
 
     #[test]
+    fn test_calculate_shared_secret_receiver() {
+        let address_key_holder = AddressKeyHolder::new_os_random();
+
+        // Generate a random ephemeral public key sender
+        let scalar = Scalar::random(&mut OsRng);
+        let ephemeral_public_key_sender = (ProjectivePoint::generator() * scalar).to_affine();
+
+        // Calculate shared secret
+        let shared_secret = address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
+
+        // Ensure the shared secret is not an identity point (suggesting non-zero output)
+        assert!(!Into::<bool>::into(shared_secret.is_identity()));
+    }
+
+    #[test]
     fn key_generation_test() {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
