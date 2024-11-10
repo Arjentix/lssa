@@ -20,3 +20,9 @@ pub fn prove<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) -> (u64, R
     let digest = receipt.journal.decode().unwrap();
     (digest, receipt)
 }
+
+pub fn verify(receipt: Receipt, image_id: impl Into<Digest>) {
+    receipt
+    .verify(image_id)
+    .expect("receipt verification failed");
+}
