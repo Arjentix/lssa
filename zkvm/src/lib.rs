@@ -60,4 +60,18 @@ mod tests {
             message + message_2
         );
     }
+
+    #[test]
+    fn simple_multiplication() {
+        let message = 1;
+        let message_2 = 2;
+    
+        let (digest, receipt) = prove(vec![message, message_2], MULTIPLICATION_ELF);
+    
+        verify(receipt, MULTIPLICATION_ID);
+        assert_eq!(
+            digest,
+            message * message_2
+        );
+    }
 }
