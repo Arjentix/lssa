@@ -91,4 +91,14 @@ mod tests {
         verify(receipt, MULTIPLICATION_ID);
         assert_eq!(digest, message * message_2);
     }
+
+    #[test]
+    fn execute_simple_sum() {
+        let message: u64 = 1;
+        let message_2: u64 = 2;
+
+        let result = execute(vec![message, message_2], SUMMATION_ELF);
+        assert_eq!(result, message + message_2);
+    }
+
 }
