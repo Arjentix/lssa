@@ -1,4 +1,4 @@
-use risc0_zkvm::{default_prover, sha::Digest, ExecutorEnv, Receipt};
+use risc0_zkvm::{default_prover, sha::Digest, ExecutorEnv, Receipt, default_executor};
 
 pub fn prove<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) -> (u64, Receipt) {
     let mut builder = ExecutorEnv::builder();
@@ -15,6 +15,21 @@ pub fn prove<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) -> (u64, R
 
     let digest = receipt.journal.decode().unwrap();
     (digest, receipt)
+}
+
+// This only executes the program and does not generate a receipt.
+pub fn execute<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) {
+    let mut builder = ExecutorEnv::builder();
+
+    for input in input_vec {
+        builder.write(&input).unwrap();
+    }
+
+    let env = builder.build().unwrap();
+
+    let exec = default_executor();
+
+    exec.execute(env, elf).unwrap();
 }
 
 pub fn verify(receipt: Receipt, image_id: impl Into<Digest>) {
