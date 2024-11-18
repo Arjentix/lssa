@@ -50,6 +50,7 @@ mod tests {
     use super::*;
     use test_methods::{MULTIPLICATION_ELF, MULTIPLICATION_ID};
     use test_methods::{SUMMATION_ELF, SUMMATION_ID};
+    use test_methods::{BIG_CALCULATION_ELF, BIG_CALCULATION_ID};
 
     #[test]
     fn prove_simple_sum() {
@@ -112,4 +113,24 @@ mod tests {
         let result = execute(vec![message, message_2], SUMMATION_ELF);
         assert_eq!(result, message + message_2);
     }
+
+    #[test]
+    fn execute_big_calculation() {
+        let message: u128 = 1;
+        let message_2: u128 = 2;
+
+        let result = execute(vec![message, message_2], BIG_CALCULATION_ELF);
+        assert_eq!(result, big_calculation(message, message_2));
+    }
+
+
+    fn big_calculation(lhs: u128, rhs: u128) -> u128 {
+        let mut res = 1_u128;
+        for _ in 0..lhs {
+            res *= rhs;
+            res += lhs;
+        }
+
+        res
+    } 
 }
