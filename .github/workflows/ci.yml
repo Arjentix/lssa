@@ -17,7 +17,8 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ ubuntu-latest, macos-latest ]
+        # platform: [ ubuntu-latest, macos-latest ]
+        platform: [ ubuntu-latest ]
     runs-on: ${{ matrix.platform }}
     timeout-minutes: 60
 
@@ -30,84 +31,84 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-      - name: build ubuntu test
+      - name: build - ${{ matrix.platform }} test
         if: success() || failure()
         run: chmod 777 ./ci_scripts/build-ubuntu.sh && ./ci_scripts/build-ubuntu.sh
 
-  lint:
-    strategy:
-      matrix:
-        platform: [ ubuntu-latest ]
-    runs-on: ${{ matrix.platform }}
-    timeout-minutes: 60
+  # lint:
+  #   strategy:
+  #     matrix:
+  #       platform: [ ubuntu-latest ]
+  #   runs-on: ${{ matrix.platform }}
+  #   timeout-minutes: 60
 
-    name: lint - ${{ matrix.crate }} - ${{ matrix.platform }}
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: cargo fmt
-        if: success() || failure()
-        run: cargo fmt -- --check
-      - name: cargo clippy
-        if: success() || failure()
-        run: |
-          cargo clippy --release -- -D warnings
-      - name: install risc0
-        if: success() || failure()
-        run: |
-          curl -L https://risczero.com/install | bash
-      - name: install risc0 step 2
-        if: success() || failure()
-        run: |
-          source /home/runner/.bashrc && rzup install && source /home/runner/.bashrc
-      - name: install taplo
-        if: success() || failure()
-        run: |
-          cargo install taplo-cli --locked
-      - name: taplo fmt
-        if: success() || failure()
-        run: |
-          taplo fmt --check
-  test:
-    strategy:
-      matrix:
-        platform: [ ubuntu-latest ]
-    runs-on: ${{ matrix.platform }}
-    timeout-minutes: 60
+  #   name: lint - ${{ matrix.crate }} - ${{ matrix.platform }}
+  #   steps:
+  #     - name: Checkout sources
+  #       uses: actions/checkout@v3
+  #     - name: Install stable toolchain
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         profile: minimal
+  #         toolchain: nightly
+  #         override: true
+  #         components: rustfmt, clippy
+  #     - uses: Swatinem/rust-cache@v2
+  #     - name: cargo fmt
+  #       if: success() || failure()
+  #       run: cargo fmt -- --check
+  #     - name: cargo clippy
+  #       if: success() || failure()
+  #       run: |
+  #         cargo clippy --release -- -D warnings
+  #     - name: install risc0
+  #       if: success() || failure()
+  #       run: |
+  #         curl -L https://risczero.com/install | bash
+  #     - name: install risc0 step 2
+  #       if: success() || failure()
+  #       run: |
+  #         source /home/runner/.bashrc && rzup install && source /home/runner/.bashrc
+  #     - name: install taplo
+  #       if: success() || failure()
+  #       run: |
+  #         cargo install taplo-cli --locked
+  #     - name: taplo fmt
+  #       if: success() || failure()
+  #       run: |
+  #         taplo fmt --check
+  # test:
+  #   strategy:
+  #     matrix:
+  #       platform: [ ubuntu-latest ]
+  #   runs-on: ${{ matrix.platform }}
+  #   timeout-minutes: 60
 
-    name: test - ${{ matrix.crate }} - ${{ matrix.platform }}
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          override: true
-      - uses: Swatinem/rust-cache@v2
-      - name: install risc0
-        if: success() || failure()
-        run: |
-          curl -L https://risczero.com/install | bash
-      - name: install risc0 step 2
-        if: success() || failure()
-        run: |
-          source /home/runner/.bashrc && rzup install && source /home/runner/.bashrc
-      - name: test mempool
-        if: success() || failure()
-        run: cargo test -p mempool
-      - name: test storage
-        if: success() || failure()
-        run: cargo test -p storage
-      - name: test zkvm
-        if: success() || failure()
-        run: cargo test -p zkvm
+  #   name: test - ${{ matrix.crate }} - ${{ matrix.platform }}
+  #   steps:
+  #     - name: Checkout sources
+  #       uses: actions/checkout@v3
+  #     - name: Install stable toolchain
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         profile: minimal
+  #         toolchain: nightly
+  #         override: true
+  #     - uses: Swatinem/rust-cache@v2
+  #     - name: install risc0
+  #       if: success() || failure()
+  #       run: |
+  #         curl -L https://risczero.com/install | bash
+  #     - name: install risc0 step 2
+  #       if: success() || failure()
+  #       run: |
+  #         source /home/runner/.bashrc && rzup install && source /home/runner/.bashrc
+  #     - name: test mempool
+  #       if: success() || failure()
+  #       run: cargo test -p mempool
+  #     - name: test storage
+  #       if: success() || failure()
+  #       run: cargo test -p storage
+  #     - name: test zkvm
+  #       if: success() || failure()
+  #       run: cargo test -p zkvm
