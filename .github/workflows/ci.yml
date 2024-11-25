@@ -14,15 +14,11 @@ on:
 name: General
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        # platform: [ ubuntu-latest, macos-latest ]
-        platform: [ ubuntu-latest ]
-    runs-on: ${{ matrix.platform }}
+  build-ubuntu-latest:
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
-    name: build - ${{ matrix.platform }}
+    name: build - ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Install stable toolchain
@@ -31,9 +27,27 @@ jobs:
           profile: minimal
           toolchain: nightly
           override: true
-      - name: build - ${{ matrix.platform }} test
+      - name: build - ubuntu-latest
         if: success() || failure()
         run: chmod 777 ./ci_scripts/build-ubuntu.sh && ./ci_scripts/build-ubuntu.sh
+
+
+  build-macos-latest:
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    name: build - macos-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          override: true
+      - name: build - macos-latest
+        if: success() || failure()
+        run: chmod 777 ./ci_scripts/build-macos.sh && ./ci_scripts/build-macos.sh
 
   # lint:
   #   strategy:
