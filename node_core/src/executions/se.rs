@@ -42,7 +42,6 @@ pub fn commit(comm: &CommitmentSecrets, tag: Tag) -> PedersenCommitment {
     PedersenCommitment::new(SECP256K1, comm.value, comm.value_blinding_factor, generator)
 }
 
-// Hash function placeholder (replace with your cryptographic library's hash).
 fn hash(input: &[u8]) -> Vec<u8> {
     Sha256::digest(input).to_vec()
 }
