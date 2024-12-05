@@ -2668,6 +2668,8 @@ dependencies = [
  "serde_json",
  "sha2 0.10.8",
  "storage",
+ "thiserror",
+ "tokio",
  "utxo",
 ]
 
