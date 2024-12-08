@@ -9,6 +9,8 @@ use rocksdb::{
 };
 
 pub mod block;
+pub mod commitment;
+pub mod commitments_sparse_merkle_tree;
 pub mod error;
 pub mod merkle_tree_public;
 pub mod nullifier;
