@@ -164,4 +164,35 @@ mod tests {
         assert!(account.utxo_tree.store.get(&account.address).is_none());
     }
 
+    #[test]
+    fn test_add_new_utxo_outputs() {
+        let mut account = Account::new();
+        let utxo1 = generate_dummy_utxo(account.address, 100);
+        let utxo2 = generate_dummy_utxo(account.address, 200);
+
+        let result = account.add_new_utxo_outputs(vec![utxo1.clone(), utxo2.clone()]);
+
+        assert!(result.is_ok());
+        assert_eq!(account.utxo_tree.store.len(), 2);
+    }
+
+    #[test]
+    fn test_update_public_balance() {
+        let mut account = Account::new();
+        account.update_public_balance(500);
+
+        assert_eq!(account.balance, 500);
+    }
+
+    #[test]
+    fn test_add_asset() {
+        let mut account = Account::new();
+        let asset = "dummy_asset";
+        let amount = 1000u128;
+
+        let result = account.add_asset(asset, amount, false);
+
+        assert!(result.is_ok());
+        assert_eq!(account.utxo_tree.store.len(), 1);
+    }
 }
