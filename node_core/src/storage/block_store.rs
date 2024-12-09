@@ -24,6 +24,11 @@ impl NodeBlockStore {
         NodeBlockStore::open_db_with_genesis(location, None)
     }
 
+    ///Reloading existing database
+    pub fn open_db_reload(location: &Path) -> Result<Self> {
+        NodeBlockStore::open_db_with_genesis(location, None)
+    }
+
     ///Destroying existing database
     fn db_destroy(location: &Path) -> Result<()> {
         RocksDBIO::destroy(location).map_err(|err| anyhow!("RocksDBIO error: {}", err))
@@ -41,9 +46,7 @@ impl NodeBlockStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-    use storage::block::{Block, BlockHash, BlockId, Data};
-    use storage::transaction::Transaction;
+    use storage::block::{Block, Data};
     use tempfile::tempdir;
 
     fn create_genesis_block() -> Block {
@@ -97,6 +100,22 @@ mod tests {
         // The block should no longer be available since no genesis block is set on restart
         let result = node_store.get_block_at_id(0);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_open_db_reload() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let genesis_block = create_genesis_block();
+        let _ = NodeBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
+
+        // Reload the database
+        let node_store = NodeBlockStore::open_db_reload(path).unwrap();
+
+        // The genesis block should be available on reload
+        let result = node_store.get_block_at_id(0);
+        assert!(!result.is_err());
     }
 
     #[test]
