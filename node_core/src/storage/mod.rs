@@ -6,9 +6,13 @@ use anyhow::Result;
 use block_store::NodeBlockStore;
 use storage::{
     block::Block,
-    merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
+    merkle_tree_public::{
+        merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
+        TreeHashType,
+    },
     nullifier::UTXONullifier,
     nullifier_sparse_merkle_tree::NullifierSparseMerkleTree,
+    transaction::Transaction,
     utxo_commitment::UTXOCommitment,
 };
 
@@ -77,5 +81,14 @@ impl NodeChainStore {
         self.block_store.put_block_at_id(block)?;
 
         Ok(())
+    }
+
+    pub fn calculate_transaction_execution(
+        &mut self,
+        _acc_addr: AccountAddress,
+        _contract_addr: TreeHashType,
+        _call_data: Vec<u8>,
+    ) -> Transaction {
+        todo!()
     }
 }

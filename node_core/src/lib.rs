@@ -21,11 +21,12 @@ pub struct NodeCore {
     pub main_acc: Account,
     pub node_config: NodeConfig,
     pub db_updater_handle: JoinHandle<Result<()>>,
+    pub sequencer_client: Arc<SequencerClient>,
 }
 
 impl NodeCore {
     pub async fn start_from_config_update_chain(config: NodeConfig) -> Result<Self> {
-        let client = SequencerClient::new(config.clone())?;
+        let client = Arc::new(SequencerClient::new(config.clone())?);
 
         let genesis_id = client.get_genesis_id().await?;
         let genesis_block = client.get_block(genesis_id.genesis_id).await?.block;
@@ -83,6 +84,7 @@ impl NodeCore {
             main_acc: account,
             node_config: config.clone(),
             db_updater_handle: updater_handle,
+            sequencer_client: client.clone(),
         })
     }
 }

@@ -9,7 +9,7 @@ use rpc_primitives::{
 
 use crate::{
     rpc_error_responce_inverter,
-    types::rpc_structs::{HelloRequest, HelloResponse},
+    types::{err_rpc::cast_seq_client_error_into_rpc_error, rpc_structs::{RegisterAccountRequest, RegisterAccountResponse, SendTxRequest}},
 };
 
 use super::{respond, types::err_rpc::RpcErr, JsonHandler};
@@ -31,13 +31,33 @@ impl JsonHandler {
         }
     }
 
-    #[allow(clippy::unused_async)]
-    ///Example of request processing
-    async fn process_temp_hello(&self, request: Request) -> Result<Value, RpcErr> {
-        let _hello_request = HelloRequest::parse(Some(request.params))?;
+    async fn process_register_account(&self, request: Request) -> Result<Value, RpcErr> {
+        let req = RegisterAccountRequest::parse(Some(request.params))?;
 
-        let helperstruct = HelloResponse {
-            greeting: "HELLO_FROM_NODE".to_string(),
+        {
+            let guard = self.node_chain_store.lock().await;
+
+            guard.sequencer_client.register_account(&guard.main_acc).await.map_err(cast_seq_client_error_into_rpc_error)?;
+        }
+
+        let helperstruct = RegisterAccountResponse {
+            status: "success".to_string()
+        };
+
+        respond(helperstruct)
+    }
+
+    async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
+        let req = SendTxRequest::parse(Some(request.params))?;
+
+        {
+            let guard = self.node_chain_store.lock().await;
+
+            guard.sequencer_client.send_tx(req.transaction).await.map_err(cast_seq_client_error_into_rpc_error)?;
+        }
+
+        let helperstruct = RegisterAccountResponse {
+            status: "success".to_string()
         };
 
         respond(helperstruct)
@@ -46,7 +66,8 @@ impl JsonHandler {
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             //Todo : Add handling of more JSON RPC methods
-            "hello" => self.process_temp_hello(request).await,
+            "register_account" => self.process_register_account(request).await,
+            "send_tx" => self.process_send_tx(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }

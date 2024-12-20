@@ -1,4 +1,78 @@
+use accounts::account_core::{Account, AccountAddress};
 use risc0_zkvm::{default_executor, default_prover, sha::Digest, ExecutorEnv, Receipt};
+use utxo::utxo_core::{UTXOPayload, UTXO};
+
+pub fn prove_mint_utxo(amount_to_mint: u128, owner: AccountAddress) -> UTXO {
+    let mut builder = ExecutorEnv::builder();
+
+    builder.write(&amount_to_mint).unwrap();
+    builder.write(&owner).unwrap();
+
+    let env = builder.build().unwrap();
+
+    let prover = default_prover();
+
+    let receipt = prover.prove(env, test_methods::MINT_UTXO_ELF).unwrap().receipt;
+
+    let digest: UTXOPayload = receipt.journal.decode().unwrap();
+    
+    UTXO::create_utxo_from_payload(digest)
+}
+
+pub fn prove_send_utxo(spent_utxo: UTXO, owners_parts: Vec<(u128, AccountAddress)>) -> (UTXO, Vec<(UTXO, AccountAddress)>) {
+    let mut builder = ExecutorEnv::builder();
+
+    builder.write(&spent_utxo).unwrap();
+    builder.write(&owners_parts).unwrap();
+
+    let env = builder.build().unwrap();
+
+    let prover = default_prover();
+
+    let receipt = prover.prove(env, test_methods::SEND_UTXO_ELF).unwrap().receipt;
+
+    let digest: (UTXOPayload, Vec<(UTXOPayload, AccountAddress)>) = receipt.journal.decode().unwrap();
+    
+    (UTXO::create_utxo_from_payload(digest.0), digest.1.into_iter().map(|(payload, addr)| (
+        UTXO::create_utxo_from_payload(payload), addr
+    )).collect())
+}
+
+pub fn execute_mint_utxo(amount_to_mint: u128, owner: AccountAddress) -> UTXO {
+    let mut builder = ExecutorEnv::builder();
+
+    builder.write(&amount_to_mint).unwrap();
+    builder.write(&owner).unwrap();
+
+    let env = builder.build().unwrap();
+
+    let executor = default_executor();
+
+    let receipt = executor.execute(env, test_methods::MINT_UTXO_ELF).unwrap();
+
+    let digest: UTXOPayload = receipt.journal.decode().unwrap();
+    
+    UTXO::create_utxo_from_payload(digest)
+}
+
+pub fn execute_send_utxo(spent_utxo: UTXO, owners_parts: Vec<(u128, AccountAddress)>) -> (UTXO, Vec<(UTXO, AccountAddress)>) {
+    let mut builder = ExecutorEnv::builder();
+
+    builder.write(&spent_utxo).unwrap();
+    builder.write(&owners_parts).unwrap();
+
+    let env = builder.build().unwrap();
+
+    let executor = default_executor();
+
+    let receipt = executor.execute(env, test_methods::SEND_UTXO_ELF).unwrap();
+
+    let digest: (UTXOPayload, Vec<(UTXOPayload, AccountAddress)>) = receipt.journal.decode().unwrap();
+    
+    (UTXO::create_utxo_from_payload(digest.0), digest.1.into_iter().map(|(payload, addr)| (
+        UTXO::create_utxo_from_payload(payload), addr
+    )).collect())
+}
 
 pub fn prove<T: serde::ser::Serialize>(input_vec: Vec<T>, elf: &[u8]) -> (u64, Receipt) {
     let mut builder = ExecutorEnv::builder();
