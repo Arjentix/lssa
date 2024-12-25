@@ -6,6 +6,8 @@ use std::{
     },
 };
 
+use k256::elliptic_curve::group::GroupEncoding;
+
 use ::storage::transaction::{Transaction, TransactionPayload, TxKind};
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
@@ -14,16 +16,19 @@ use executions::{
     private_exec::{generate_commitments, generate_nullifiers},
     se::{commit, tag_random},
 };
+use log::info;
 use rand::thread_rng;
 use secp256k1_zkp::{CommitmentSecrets, Tweak};
 use sequencer_client::{json::SendTxResponse, SequencerClient};
 use serde::{Deserialize, Serialize};
 use storage::NodeChainStore;
-use tokio::{sync::Mutex, task::JoinHandle};
+use tokio::{sync::RwLock, task::JoinHandle};
 use utxo::utxo_core::UTXO;
 use zkvm::{
     prove_mint_utxo, prove_send_utxo, prove_send_utxo_deshielded, prove_send_utxo_shielded,
 };
+
+pub const BLOCK_GEN_DELAY_SECS: u64 = 20;
 
 pub mod config;
 pub mod executions;
@@ -55,9 +60,8 @@ pub enum ActionData {
 }
 
 pub struct NodeCore {
-    pub storage: Arc<Mutex<NodeChainStore>>,
+    pub storage: Arc<RwLock<NodeChainStore>>,
     pub curr_height: Arc<AtomicU64>,
-    pub acc_map: HashMap<AccountAddress, Account>,
     pub node_config: NodeConfig,
     pub db_updater_handle: JoinHandle<Result<()>>,
     pub sequencer_client: Arc<SequencerClient>,
@@ -71,8 +75,6 @@ impl NodeCore {
         let genesis_block = client.get_block(genesis_id.genesis_id).await?.block;
 
         let mut storage = NodeChainStore::new_with_genesis(&config.home, genesis_block);
-
-        let account_map = HashMap::new();
 
         let mut chain_height = genesis_id.genesis_id;
 
@@ -89,7 +91,7 @@ impl NodeCore {
             chain_height += 1;
         }
 
-        let wrapped_storage = Arc::new(Mutex::new(storage));
+        let wrapped_storage = Arc::new(RwLock::new(storage));
         let chain_height_wrapped = Arc::new(AtomicU64::new(chain_height));
 
         let wrapped_storage_thread = wrapped_storage.clone();
@@ -102,7 +104,7 @@ impl NodeCore {
 
                 if let Ok(block) = client_thread.get_block(next_block).await {
                     {
-                        let mut storage_guard = wrapped_storage_thread.lock().await;
+                        let mut storage_guard = wrapped_storage_thread.write().await;
 
                         storage_guard.dissect_insert_block(block.block)?;
                     }
@@ -120,20 +122,39 @@ impl NodeCore {
         Ok(Self {
             storage: wrapped_storage,
             curr_height: chain_height_wrapped,
-            acc_map: account_map,
             node_config: config.clone(),
             db_updater_handle: updater_handle,
             sequencer_client: client.clone(),
         })
     }
 
-    pub fn mint_utxo_private(&self, acc: AccountAddress, amount: u128) -> Transaction {
+    pub async fn create_new_account(&mut self) -> AccountAddress {
+        let account = Account::new();
+
+        let addr = account.address;
+
+        {
+            let mut write_guard = self.storage.write().await;
+
+            write_guard.acc_map.insert(account.address, account);
+        }
+
+        addr
+    }
+
+    pub async fn mint_utxo_private(&self, acc: AccountAddress, amount: u128) -> Transaction {
         let (utxo, receipt) = prove_mint_utxo(amount, acc);
 
-        let accout = self.acc_map.get(&acc).unwrap();
+        let acc_map_read_guard = self.storage.read().await;
+
+        let accout = acc_map_read_guard.acc_map.get(&acc).unwrap();
+
+        let ephm_key_holder = &accout.produce_ephemeral_key_holder();
+
+        let eph_pub_key = ephm_key_holder.generate_ephemeral_public_key().to_bytes();
 
         let encoded_data = Account::encrypt_data(
-            &accout.produce_ephemeral_key_holder(),
+            &ephm_key_holder,
             accout.key_holder.viewing_public_key,
             &serde_json::to_vec(&utxo).unwrap(),
         );
@@ -152,6 +173,7 @@ impl NodeCore {
             nullifier_created_hashes: vec![],
             execution_proof_private: serde_json::to_string(&receipt).unwrap(),
             encoded_data: vec![(encoded_data.0, encoded_data.1.to_vec())],
+            ephemeral_pub_key: eph_pub_key.to_vec(),
         }
         .into()
     }
@@ -169,6 +191,7 @@ impl NodeCore {
             nullifier_created_hashes: vec![],
             execution_proof_private: "".to_string(),
             encoded_data: vec![],
+            ephemeral_pub_key: vec![],
         }
         .into()
     }
@@ -178,10 +201,12 @@ impl NodeCore {
         utxo: UTXO,
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Transaction {
-        let accout = self.acc_map.get(&utxo.owner).unwrap();
+        let acc_map_read_guard = self.storage.read().await;
+
+        let accout = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
 
         let commitment_in = {
-            let guard = self.storage.lock().await;
+            let guard = self.storage.write().await;
 
             guard.utxo_commitments_store.get_tx(utxo.hash).unwrap().hash
         };
@@ -203,13 +228,17 @@ impl NodeCore {
             .map(|(utxo, _)| utxo.clone())
             .collect();
 
+        let ephm_key_holder = &accout.produce_ephemeral_key_holder();
+
+        let eph_pub_key = ephm_key_holder.generate_ephemeral_public_key().to_bytes();
+
         let encoded_data: Vec<(Vec<u8>, Vec<u8>)> = utxos
             .iter()
             .map(|utxo_enc| {
-                let accout_enc = self.acc_map.get(&utxo_enc.owner).unwrap();
+                let accout_enc = acc_map_read_guard.acc_map.get(&utxo_enc.owner).unwrap();
 
                 let (ciphertext, nonce) = Account::encrypt_data(
-                    &accout.produce_ephemeral_key_holder(),
+                    &ephm_key_holder,
                     accout_enc.key_holder.viewing_public_key,
                     &serde_json::to_vec(&utxo_enc).unwrap(),
                 );
@@ -232,6 +261,7 @@ impl NodeCore {
             nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
             execution_proof_private: serde_json::to_string(&receipt).unwrap(),
             encoded_data,
+            ephemeral_pub_key: eph_pub_key.to_vec(),
         }
         .into()
     }
@@ -242,7 +272,9 @@ impl NodeCore {
         balance: u64,
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Transaction {
-        let accout = self.acc_map.get(&acc).unwrap();
+        let acc_map_read_guard = self.storage.read().await;
+
+        let accout = acc_map_read_guard.acc_map.get(&acc).unwrap();
 
         let commitment_secrets = CommitmentSecrets {
             value: balance,
@@ -278,13 +310,17 @@ impl NodeCore {
             .map(|(utxo, _)| utxo.clone())
             .collect();
 
+        let ephm_key_holder = &accout.produce_ephemeral_key_holder();
+
+        let eph_pub_key = ephm_key_holder.generate_ephemeral_public_key().to_bytes();
+
         let encoded_data: Vec<(Vec<u8>, Vec<u8>)> = utxos
             .iter()
             .map(|utxo_enc| {
-                let accout_enc = self.acc_map.get(&utxo_enc.owner).unwrap();
+                let accout_enc = acc_map_read_guard.acc_map.get(&utxo_enc.owner).unwrap();
 
                 let (ciphertext, nonce) = Account::encrypt_data(
-                    &accout.produce_ephemeral_key_holder(),
+                    &ephm_key_holder,
                     accout_enc.key_holder.viewing_public_key,
                     &serde_json::to_vec(&utxo_enc).unwrap(),
                 );
@@ -313,6 +349,7 @@ impl NodeCore {
             nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
             execution_proof_private: serde_json::to_string(&receipt).unwrap(),
             encoded_data,
+            ephemeral_pub_key: eph_pub_key.to_vec(),
         }
         .into()
     }
@@ -322,10 +359,12 @@ impl NodeCore {
         utxo: UTXO,
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Transaction {
-        let accout = self.acc_map.get(&utxo.owner).unwrap();
+        let acc_map_read_guard = self.storage.read().await;
+
+        let accout = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
 
         let commitment_in = {
-            let guard = self.storage.lock().await;
+            let guard = self.storage.write().await;
 
             guard.utxo_commitments_store.get_tx(utxo.hash).unwrap().hash
         };
@@ -356,6 +395,7 @@ impl NodeCore {
             nullifier_created_hashes: vec![nullifier.try_into().unwrap()],
             execution_proof_private: serde_json::to_string(&receipt).unwrap(),
             encoded_data: vec![],
+            ephemeral_pub_key: vec![],
         }
         .into()
     }
@@ -367,7 +407,7 @@ impl NodeCore {
     ) -> Result<SendTxResponse> {
         Ok(self
             .sequencer_client
-            .send_tx(self.mint_utxo_private(acc, amount))
+            .send_tx(self.mint_utxo_private(acc, amount).await)
             .await?)
     }
 
@@ -414,5 +454,45 @@ impl NodeCore {
             .sequencer_client
             .send_tx(self.transfer_utxo_deshielded(utxo, receivers).await)
             .await?)
+    }
+
+    pub async fn scenario_1(&mut self) {
+        let acc_addr = self.create_new_account().await;
+
+        let resp = self.send_private_mint_tx(acc_addr, 100).await.unwrap();
+        info!("Response for mint private is {resp:?}");
+
+        let new_utxo_hash: [u8; 32] = hex::decode(resp.additional_data.unwrap())
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        info!("Awaiting new blocks");
+        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
+
+        let new_utxo = {
+            let mut write_guard = self.storage.write().await;
+
+            let acc = write_guard.acc_map.get_mut(&acc_addr).unwrap();
+
+            acc.utxo_tree
+                .get_item(new_utxo_hash)
+                .unwrap()
+                .unwrap()
+                .clone()
+        };
+
+        let acc_map_read_guard = self.storage.read().await;
+        let acc = acc_map_read_guard.acc_map.get(&acc_addr).unwrap();
+        let resp = self
+            .send_deshielded_send_tx(new_utxo, vec![(100, acc_addr)])
+            .await
+            .unwrap();
+        info!("Response for send deshielded is {resp:?}");
+
+        info!("Awaiting new blocks");
+        tokio::time::sleep(std::time::Duration::from_secs(BLOCK_GEN_DELAY_SECS)).await;
+
+        info!("New account public balance is {:?}", acc.balance);
     }
 }

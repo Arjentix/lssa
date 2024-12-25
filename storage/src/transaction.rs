@@ -39,6 +39,8 @@ pub struct Transaction {
     pub execution_proof_private: String,
     ///Encoded blobs of data
     pub encoded_data: Vec<(CipherText, Vec<u8>)>,
+    ///Transaction senders ephemeral pub key
+    pub ephemeral_pub_key: Vec<u8>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -59,6 +61,8 @@ pub struct TransactionPayload {
     pub execution_proof_private: String,
     ///Encoded blobs of data
     pub encoded_data: Vec<(CipherText, Vec<u8>)>,
+    ///Transaction senders ephemeral pub key
+    pub ephemeral_pub_key: Vec<u8>,
 }
 
 impl From<TransactionPayload> for Transaction {
@@ -81,6 +85,7 @@ impl From<TransactionPayload> for Transaction {
             nullifier_created_hashes: value.nullifier_created_hashes,
             execution_proof_private: value.execution_proof_private,
             encoded_data: value.encoded_data,
+            ephemeral_pub_key: value.ephemeral_pub_key,
         }
     }
 }

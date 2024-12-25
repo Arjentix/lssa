@@ -2705,6 +2705,7 @@ dependencies = [
  "consensus",
  "env_logger",
  "futures",
+ "hex",
  "log",
  "networking",
  "node_core",

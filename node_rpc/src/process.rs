@@ -34,25 +34,21 @@ impl JsonHandler {
         }
     }
 
-    // async fn process_register_account(&self, request: Request) -> Result<Value, RpcErr> {
-    //     let req = RegisterAccountRequest::parse(Some(request.params))?;
+    async fn process_register_account(&self, request: Request) -> Result<Value, RpcErr> {
+        let _req = RegisterAccountRequest::parse(Some(request.params))?;
 
-    //     {
-    //         let guard = self.node_chain_store.lock().await;
+        let acc_addr = {
+            let mut guard = self.node_chain_store.lock().await;
 
-    //         guard
-    //             .sequencer_client
-    //             .register_account(&guard.main_acc)
-    //             .await
-    //             .map_err(cast_seq_client_error_into_rpc_error)?;
-    //     }
+            guard.create_new_account().await
+        };
 
-    //     let helperstruct = RegisterAccountResponse {
-    //         status: "success".to_string(),
-    //     };
+        let helperstruct = RegisterAccountResponse {
+            status: hex::encode(acc_addr),
+        };
 
-    //     respond(helperstruct)
-    // }
+        respond(helperstruct)
+    }
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
         let req = SendTxRequest::parse(Some(request.params))?;
@@ -77,7 +73,7 @@ impl JsonHandler {
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
         match request.method.as_ref() {
             //Todo : Add handling of more JSON RPC methods
-            //"register_account" => self.process_register_account(request).await,
+            "register_account" => self.process_register_account(request).await,
             "send_tx" => self.process_send_tx(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
