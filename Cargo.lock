@@ -4349,6 +4349,7 @@ dependencies = [
  "anyhow",
  "elliptic-curve",
  "env_logger",
+ "hex",
  "log",
  "lru",
  "monotree",
@@ -4817,6 +4818,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "env_logger",
+ "hex",
  "log",
  "monotree",
  "serde",

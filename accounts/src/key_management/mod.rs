@@ -3,6 +3,7 @@ use constants_types::{CipherText, Nonce};
 use elliptic_curve::group::GroupEncoding;
 use ephemeral_key_holder::EphemeralKeyHolder;
 use k256::AffinePoint;
+use log::info;
 use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
 use storage::merkle_tree_public::TreeHashType;
 
@@ -73,6 +74,14 @@ impl AddressKeyHolder {
         let cipher = Aes256Gcm::new(&key);
 
         cipher.decrypt(&nonce, ciphertext.as_slice()).unwrap()
+    }
+
+    pub fn log(&self) {
+        info!("AddressKeyHolder top_secret_key_holder is {:?}", self.top_secret_key_holder);
+        info!("AddressKeyHolder utxo_secret_key_holder is {:?}", self.utxo_secret_key_holder);
+        info!("AddressKeyHolder address is {:?}", self.address);
+        info!("AddressKeyHolder nullifer_public_key is {:?}", self.nullifer_public_key);
+        info!("AddressKeyHolder viewing_public_key is {:?}", self.viewing_public_key);
     }
 }
 
