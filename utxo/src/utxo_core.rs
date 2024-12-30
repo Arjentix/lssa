@@ -1,4 +1,5 @@
 use anyhow::Result;
+use log::info;
 use serde::{Deserialize, Serialize};
 use sha2::{digest::FixedOutput, Digest};
 use storage::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, AccountId};
@@ -68,6 +69,15 @@ impl UTXO {
             amount: self.amount, 
             privacy_flag: self.privacy_flag, 
         }
+    }
+
+    pub fn log(&self) {
+        info!("UTXO hash is {:?}", hex::encode(self.hash));
+        info!("UTXO owner is {:?}", self.owner);
+        info!("UTXO nullifier is {:?}", self.nullifier.clone().map(|val| hex::encode(val.utxo_hash)));
+        info!("UTXO asset is {:?}", hex::encode(self.asset.clone()));
+        info!("UTXO amount is {:?}", self.amount);
+        info!("UTXO privacy_flag is {:?}", self.privacy_flag);
     }
 }
 
