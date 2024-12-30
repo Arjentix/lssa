@@ -219,18 +219,13 @@ impl NodeCore {
     pub async fn transfer_utxo_private(
         &self,
         utxo: UTXO,
+        commitment_in: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
     ) -> (Transaction, Vec<(AccountAddress, [u8; 32])>) {
         let acc_map_read_guard = self.storage.read().await;
 
         let accout = acc_map_read_guard.acc_map.get(&utxo.owner).unwrap();
         accout.log();
-
-        let commitment_in = {
-            let guard = self.storage.write().await;
-
-            guard.utxo_commitments_store.get_tx(utxo.hash).unwrap().hash
-        };
 
         let nullifier = generate_nullifiers(
             &utxo,
@@ -466,10 +461,11 @@ impl NodeCore {
     pub async fn send_private_send_tx(
         &self,
         utxo: UTXO,
+        comm_hash: [u8; 32],
         receivers: Vec<(u128, AccountAddress)>,
     ) -> Result<(SendTxResponse, Vec<([u8; 32], [u8; 32])>)> {
         let point_before_prove = std::time::Instant::now();
-        let (tx, utxo_hashes) = self.transfer_utxo_private(utxo, receivers).await;
+        let (tx, utxo_hashes) = self.transfer_utxo_private(utxo, comm_hash, receivers).await;
         tx.log();
         let point_after_prove = std::time::Instant::now();
 
@@ -610,9 +606,8 @@ impl NodeCore {
     ///Mint utxo, privately send it to another user
     pub async fn subscenario_3(&mut self) {
         let acc_addr = self.create_new_account().await;
-        let acc_addr_rec = self.create_new_account().await;
 
-        let (resp, _, new_utxo_hash) = self.send_private_mint_tx(acc_addr, 100).await.unwrap();
+        let (resp, new_utxo_hash, comm_gen_hash) = self.send_private_mint_tx(acc_addr, 100).await.unwrap();
         info!("Response for mint private is {resp:?}");
 
         info!("Awaiting new blocks");
@@ -632,8 +627,10 @@ impl NodeCore {
         };
         new_utxo.log();
 
+        let acc_addr_rec = self.create_new_account().await;
+
         let (resp, new_utxo_hashes) = self
-            .send_private_send_tx(new_utxo, vec![(100, acc_addr_rec)])
+            .send_private_send_tx(new_utxo, comm_gen_hash, vec![(100, acc_addr_rec)])
             .await
             .unwrap();
         info!("Response for send deshielded is {resp:?}");
