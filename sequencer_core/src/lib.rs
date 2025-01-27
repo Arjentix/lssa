@@ -405,4 +405,22 @@ mod tests {
         assert_eq!(sequencer.mempool.len(), 1);
     }
 
+    #[test]
+    fn test_produce_new_block_with_mempool_transactions() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        let tx = create_dummy_transaction(
+            [4; 32], 
+            vec![[94; 32]],
+            vec![[7; 32]],
+            vec![[8; 32]],
+        );
+        let tx_mempool = TransactionMempool { tx };
+        sequencer.mempool.push_item(tx_mempool);
+
+        let block_id = sequencer.produce_new_block_with_mempool_transactions();
+        assert!(block_id.is_ok());
+        assert_eq!(block_id.unwrap(), 1);
+    }
 }
