@@ -384,5 +384,25 @@ mod tests {
         ));
     }
 
+    #[test]
+    fn test_push_tx_into_mempool_pre_check() {
+        let config = setup_sequencer_config();
+        let mut sequencer = SequencerCore::start_from_config(config);
+
+        common_setup(&mut sequencer);
+
+        let tx = create_dummy_transaction(
+            [3; 32],
+            vec![[93; 32]],
+            vec![[73; 32]],
+            vec![[83; 32]]
+        );
+        let tx_roots = sequencer.get_tree_roots();
+        let tx_mempool = TransactionMempool { tx };
+
+        let result = sequencer.push_tx_into_mempool_pre_check(tx_mempool.clone(), tx_roots);
+        assert!(result.is_ok());
+        assert_eq!(sequencer.mempool.len(), 1);
+    }
 
 }
