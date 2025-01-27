@@ -254,3 +254,32 @@ impl SequencerCore {
         Ok(self.chain_height - 1)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{fmt::format, path::PathBuf};
+
+    use rand::Rng;
+    use storage::transaction::{Transaction, TxKind};
+    use transaction_mempool::TransactionMempool;
+
+    fn setup_sequencer_config() -> SequencerConfig {
+        let mut rng = rand::thread_rng();
+        let random_u8: u8 = rng.gen();
+
+        let path_str = format!("/tmp/sequencer_{:?}", random_u8);
+
+        SequencerConfig {
+            home: PathBuf::from(path_str),
+            override_rust_log: Some("info".to_string()),
+            genesis_id: 1,
+            is_genesis_random: false,
+            max_num_tx_in_block: 10,
+            block_create_timeout_millis: 1000,
+            port: 8080,
+        }
+    }
+
+
+}
