@@ -96,8 +96,8 @@ impl RocksDBIO {
         let mut cf_opts = Options::default();
         cf_opts.set_max_write_buffer_number(16);
         //ToDo: Add more column families for different data
-        let cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
-        let cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
+        let _cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
+        let _cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
