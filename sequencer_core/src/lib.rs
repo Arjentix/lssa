@@ -62,7 +62,10 @@ impl SequencerCore {
     pub fn get_tree_roots(&self) -> [[u8; 32]; 3] {
         [
             self.store.nullifier_store.curr_root.unwrap_or([0; 32]),
-            self.store.utxo_commitments_store.get_root().unwrap_or([0; 32]),
+            self.store
+                .utxo_commitments_store
+                .get_root()
+                .unwrap_or([0; 32]),
             self.store.pub_tx_store.get_root().unwrap_or([0; 32]),
         ]
     }
