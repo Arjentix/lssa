@@ -5,10 +5,7 @@ use std::sync::{
 
 use k256::elliptic_curve::group::GroupEncoding;
 
-use ::storage::{
-    nullifier::UTXONullifier,
-    transaction::{Transaction, TransactionPayload, TxKind},
-};
+use ::storage::transaction::{Transaction, TransactionPayload, TxKind};
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
 use config::NodeConfig;
@@ -23,7 +20,7 @@ use sequencer_client::{json::SendTxResponse, SequencerClient};
 use serde::{Deserialize, Serialize};
 use storage::NodeChainStore;
 use tokio::{sync::RwLock, task::JoinHandle};
-use utxo::utxo_core::{Asset, UTXO};
+use utxo::utxo_core::UTXO;
 use zkvm::{
     prove_mint_utxo, prove_mint_utxo_multiple_assets, prove_send_utxo, prove_send_utxo_deshielded,
     prove_send_utxo_multiple_assets_one_receiver, prove_send_utxo_shielded, ExecutionFailureKind,
