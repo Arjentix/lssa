@@ -1,6 +1,6 @@
 use actix_web::Error as HttpError;
 use sequencer_core::{
-    sequecer_store::accounts_store::AccountPublicData, TransactionMalformationErrorKind,
+    sequecer_store::accounts_store::AccountPublicData,
 };
 use serde_json::Value;
 
