@@ -20,6 +20,11 @@ It can be installed as
 
 ```sh
 curl -L https://risczero.com/install | bash
+```
+
+After that, before next step, you may need to restart your console, as script updates PATH variable. Next:
+
+```sh
 rzup install
 ```
 
