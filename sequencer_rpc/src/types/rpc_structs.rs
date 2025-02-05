@@ -6,8 +6,6 @@ use sequencer_core::transaction_mempool::TransactionMempool;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use storage::block::Block;
-use storage::block::BlockId;
-use storage::transaction::Transaction;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct HelloRequest {}
