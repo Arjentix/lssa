@@ -1,7 +1,32 @@
 use accounts::account_core::AccountAddress;
 use common::ExecutionFailureKind;
 use risc0_zkvm::{default_executor, default_prover, sha::Digest, ExecutorEnv, Receipt};
+use serde::Serialize;
 use utxo::utxo_core::{UTXOPayload, UTXO};
+
+pub mod gas_calculator;
+
+pub fn gas_limits_check<INP: Serialize>(
+    input_buffer: INP,
+    elf: &[u8],
+    gas_calculator: &gas_calculator::GasCalculator,
+    attached_funds: u64,
+) -> Result<(), ExecutionFailureKind> {
+    let mut input_buffer_len: usize = 0;
+    input_buffer_len += serde_json::to_vec(&input_buffer).unwrap().len();
+
+    let gas_limit = gas_calculator
+        .gas_runtime_full(elf, input_buffer_len)
+        .ok_or(ExecutionFailureKind::InsufficientGasError)?;
+
+    let cost = gas_calculator.runtime_cost(gas_limit);
+
+    if cost > attached_funds {
+        return Err(ExecutionFailureKind::InsufficientFundsError);
+    }
+
+    Ok(())
+}
 
 pub fn prove_mint_utxo(
     amount_to_mint: u128,

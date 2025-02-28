@@ -52,6 +52,10 @@ pub enum ExecutionFailureKind {
     SequencerClientError(#[from] SequencerClientError),
     #[error("Datebase returned error : {0:?}")]
     MonoTreeError(#[from] monotree::Errors),
+    #[error("Insufficient gas for operation")]
+    InsufficientGasError,
+    #[error("Can not pay for operation")]
+    InsufficientFundsError,
 }
 
 impl ExecutionFailureKind {
