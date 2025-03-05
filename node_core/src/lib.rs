@@ -23,8 +23,9 @@ use storage::NodeChainStore;
 use tokio::{sync::RwLock, task::JoinHandle};
 use utxo::utxo_core::UTXO;
 use zkvm::{
-    prove_mint_utxo, prove_mint_utxo_multiple_assets, prove_send_utxo, prove_send_utxo_deshielded,
-    prove_send_utxo_multiple_assets_one_receiver, prove_send_utxo_shielded,
+    gas_calculator::GasCalculator, prove_mint_utxo, prove_mint_utxo_multiple_assets,
+    prove_send_utxo, prove_send_utxo_deshielded, prove_send_utxo_multiple_assets_one_receiver,
+    prove_send_utxo_shielded,
 };
 
 pub const BLOCK_GEN_DELAY_SECS: u64 = 20;
@@ -70,6 +71,7 @@ pub struct NodeCore {
     pub node_config: NodeConfig,
     pub db_updater_handle: JoinHandle<Result<()>>,
     pub sequencer_client: Arc<SequencerClient>,
+    pub gas_calculator: GasCalculator,
 }
 
 impl NodeCore {
@@ -141,6 +143,7 @@ impl NodeCore {
             node_config: config.clone(),
             db_updater_handle: updater_handle,
             sequencer_client: client.clone(),
+            gas_calculator: GasCalculator::from(config.gas_config),
         })
     }
 
