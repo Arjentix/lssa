@@ -4375,6 +4375,30 @@ dependencies = [
 ]
 
 [[package]]
+name = "sc_core"
+version = "0.1.0"
+dependencies = [
+ "accounts",
+ "anyhow",
+ "bincode",
+ "common",
+ "elliptic-curve",
+ "env_logger",
+ "hex",
+ "k256",
+ "log",
+ "monotree",
+ "rand 0.8.5",
+ "risc0-zkvm",
+ "secp256k1-zkp",
+ "serde",
+ "serde_json",
+ "sha2 0.10.8",
+ "storage",
+ "utxo",
+]
+
+[[package]]
 name = "schannel"
 version = "0.1.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
