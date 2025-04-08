@@ -7,6 +7,7 @@ use merkle_tree_public::TreeHashType;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
 };
+use sc_db_utils::{produce_blob_from_fit_vec, DataBlob, DataBlobChangeVariant};
 
 pub mod block;
 pub mod commitment;
@@ -15,6 +16,7 @@ pub mod error;
 pub mod merkle_tree_public;
 pub mod nullifier;
 pub mod nullifier_sparse_merkle_tree;
+pub mod sc_db_utils;
 pub mod transaction;
 pub mod utxo_commitment;
 
@@ -33,17 +35,27 @@ pub const BUFF_SIZE_ROCKSDB: usize = usize::MAX;
 ///Keeping small to not run out of memory
 pub const CACHE_SIZE: usize = 1000;
 
+///Size in bytes of a singular smart contract data blob, stored in db
+pub const SC_DATA_BLOB_SIZE: usize = 256;
+
 ///Key base for storing metainformation about id of first block in db
 pub const DB_META_FIRST_BLOCK_IN_DB_KEY: &str = "first_block_in_db";
 ///Key base for storing metainformation about id of last current block in db
 pub const DB_META_LAST_BLOCK_IN_DB_KEY: &str = "last_block_in_db";
 ///Key base for storing metainformation which describe if first block has been set
 pub const DB_META_FIRST_BLOCK_SET_KEY: &str = "first_block_set";
+///Key to list of all known smart contract addresses
+pub const DB_META_SC_LIST: &str = "sc_list";
 
 ///Name of block column family
 pub const CF_BLOCK_NAME: &str = "cf_block";
 ///Name of meta column family
 pub const CF_META_NAME: &str = "cf_meta";
+///Name of smart contract column family
+pub const CF_SC_NAME: &str = "cf_sc";
+
+///Suffix, used to mark field, which contain length of smart contract
+pub const SC_LEN_SUFFIX: &str = "sc_len";
 
 pub type DbResult<T> = Result<T, DbError>;
 
@@ -58,6 +70,7 @@ impl RocksDBIO {
         //ToDo: Add more column families for different data
         let cfb = ColumnFamilyDescriptor::new(CF_BLOCK_NAME, cf_opts.clone());
         let cfmeta = ColumnFamilyDescriptor::new(CF_META_NAME, cf_opts.clone());
+        let cfsc = ColumnFamilyDescriptor::new(CF_SC_NAME, cf_opts.clone());
 
         let mut db_opts = Options::default();
         db_opts.create_missing_column_families(true);
@@ -65,7 +78,7 @@ impl RocksDBIO {
         let db = DBWithThreadMode::<MultiThreaded>::open_cf_descriptors(
             &db_opts,
             path,
-            vec![cfb, cfmeta],
+            vec![cfb, cfmeta, cfsc],
         );
 
         let dbio = Self {
@@ -83,6 +96,8 @@ impl RocksDBIO {
             dbio.put_meta_is_first_block_set()?;
 
             dbio.put_meta_last_block_in_db(block_id)?;
+
+            dbio.put_meta_sc_list(vec![])?;
 
             Ok(dbio)
         } else {
@@ -112,6 +127,10 @@ impl RocksDBIO {
 
     pub fn block_column(&self) -> Arc<BoundColumnFamily> {
         self.db.cf_handle(CF_BLOCK_NAME).unwrap()
+    }
+
+    pub fn sc_column(&self) -> Arc<BoundColumnFamily> {
+        self.db.cf_handle(CF_SC_NAME).unwrap()
     }
 
     pub fn get_meta_first_block_in_db(&self) -> DbResult<u64> {
@@ -182,6 +201,19 @@ impl RocksDBIO {
         Ok(())
     }
 
+    ///Setting list of known smart contracts in a DB as a `sc_list`
+    pub fn put_meta_sc_list(&self, sc_list: Vec<String>) -> DbResult<()> {
+        let cf_meta = self.meta_column();
+        self.db
+            .put_cf(
+                &cf_meta,
+                DB_META_SC_LIST.as_bytes(),
+                serde_json::to_vec(&sc_list).unwrap(),
+            )
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        Ok(())
+    }
+
     pub fn put_meta_is_first_block_set(&self) -> DbResult<()> {
         let cf_meta = self.meta_column();
         self.db
@@ -233,4 +265,146 @@ impl RocksDBIO {
             ))
         }
     }
+
+    ///Getting list of known smart contracts in a DB
+    pub fn get_meta_sc_list(&self) -> DbResult<Vec<String>> {
+        let cf_meta = self.meta_column();
+        let sc_list = self
+            .db
+            .get_cf(&cf_meta, DB_META_SC_LIST)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+        if let Some(data) = sc_list {
+            Ok(
+                serde_json::from_slice::<Vec<String>>(&data).map_err(|serr| {
+                    DbError::serde_cast_message(
+                        serr,
+                        Some("List of Sc Deserialization failed".to_string()),
+                    )
+                })?,
+            )
+        } else {
+            Err(DbError::db_interaction_error(
+                "Sc list not found".to_string(),
+            ))
+        }
+    }
+
+    ///Push additional contract into list of known contracts in a DB
+    pub fn put_meta_sc(&self, sc_addr: String) -> DbResult<()> {
+        let mut sc_list = self.get_meta_sc_list()?;
+        sc_list.push(sc_addr);
+        self.put_meta_sc_list(sc_list)?;
+        Ok(())
+    }
+
+    ///Put/Modify sc state in db
+    pub fn put_sc_sc_state(
+        &self,
+        sc_addr: &str,
+        length: usize,
+        modifications: Vec<DataBlobChangeVariant>,
+    ) -> DbResult<()> {
+        self.put_meta_sc(sc_addr.to_string())?;
+
+        let cf_sc = self.sc_column();
+
+        let sc_addr_loc = format!("{sc_addr:?}{SC_LEN_SUFFIX}");
+        let sc_len_addr = sc_addr_loc.as_str().as_bytes();
+
+        self.db
+            .put_cf(&cf_sc, sc_len_addr, length.to_be_bytes())
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        for data_change in modifications {
+            match data_change {
+                DataBlobChangeVariant::Created { id, blob } => {
+                    let blob_addr = produce_address_for_data_blob_at_id(sc_addr, id);
+
+                    self.db
+                        .put_cf(&cf_sc, blob_addr, blob)
+                        .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+                }
+                DataBlobChangeVariant::Modified {
+                    id,
+                    blob_old: _,
+                    blob_new,
+                } => {
+                    let blob_addr = produce_address_for_data_blob_at_id(sc_addr, id);
+
+                    self.db
+                        .put_cf(&cf_sc, blob_addr, blob_new)
+                        .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+                }
+                DataBlobChangeVariant::Deleted { id } => {
+                    let blob_addr = produce_address_for_data_blob_at_id(sc_addr, id);
+
+                    self.db
+                        .delete_cf(&cf_sc, blob_addr)
+                        .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    ///Get sc state length in blobs from DB
+    pub fn get_sc_sc_state_len(&self, sc_addr: &str) -> DbResult<usize> {
+        let cf_sc = self.sc_column();
+        let sc_addr_loc = format!("{sc_addr:?}{SC_LEN_SUFFIX}");
+
+        let sc_len_addr = sc_addr_loc.as_str().as_bytes();
+
+        let sc_len = self
+            .db
+            .get_cf(&cf_sc, sc_len_addr)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(sc_len) = sc_len {
+            Ok(usize::from_be_bytes(sc_len.as_slice().try_into().unwrap()))
+        } else {
+            Err(DbError::db_interaction_error(format!(
+                "Sc len for {sc_addr:?} not found"
+            )))
+        }
+    }
+
+    ///Get full sc state from DB
+    pub fn get_sc_sc_state(&self, sc_addr: &str) -> DbResult<Vec<DataBlob>> {
+        let cf_sc = self.sc_column();
+        let sc_len = self.get_sc_sc_state_len(&sc_addr)?;
+        let mut data_blob_list = vec![];
+
+        for id in 0..sc_len {
+            let blob_addr = produce_address_for_data_blob_at_id(&sc_addr, id);
+
+            let blob = self
+                .db
+                .get_cf(&cf_sc, blob_addr)
+                .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+            if let Some(blob_data) = blob {
+                data_blob_list.push(produce_blob_from_fit_vec(blob_data));
+            } else {
+                return Err(DbError::db_interaction_error(format!(
+                    "Blob for {sc_addr:?} at id {id} not found"
+                )));
+            }
+        }
+
+        Ok(data_blob_list)
+    }
+}
+
+///Creates address for sc data blob at corresponding id
+fn produce_address_for_data_blob_at_id(sc_addr: &str, id: usize) -> Vec<u8> {
+    let mut prefix_bytes: Vec<u8> = sc_addr.as_bytes().iter().cloned().collect();
+
+    let id_bytes = id.to_be_bytes();
+
+    for byte in id_bytes {
+        prefix_bytes.push(byte);
+    }
+
+    prefix_bytes
 }
