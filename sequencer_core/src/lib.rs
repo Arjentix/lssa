@@ -262,8 +262,8 @@ mod tests {
     use super::*;
     use std::{fmt::format, path::PathBuf};
 
-    use secp256k1_zkp::Tweak;
     use rand::Rng;
+    use secp256k1_zkp::Tweak;
     use storage::transaction::{Transaction, TxKind};
     use transaction_mempool::TransactionMempool;
 
