@@ -9,12 +9,9 @@ use ::storage::transaction::{Transaction, TransactionPayload, TxKind};
 use accounts::account_core::{Account, AccountAddress};
 use anyhow::Result;
 use config::NodeConfig;
-use executions::{
-    de::new_commitment_vec,
-    private_exec::{generate_commitments, generate_nullifiers},
-};
+use executions::private_exec::{generate_commitments, generate_nullifiers};
 use log::info;
-use rand::Rng;
+use sc_core::proofs_circuits::pedersen_commitment_vec;
 use sequencer_client::{json::SendTxResponse, SequencerClient};
 use serde::{Deserialize, Serialize};
 use storage::NodeChainStore;
@@ -216,8 +213,6 @@ impl NodeCore {
 
         // TODO: fix address when correspoding method will be added
         let sc_addr = "";
-        let mut rng = rand::thread_rng();
-        let secret_r: [u8; 32] = rng.gen();
 
         let sc_state = acc_map_read_guard
             .block_store
@@ -231,15 +226,13 @@ impl NodeCore {
 
         let context = acc_map_read_guard.produce_context(account.address);
 
-        let serialized_context = serde_json::to_vec(&context).unwrap();
-
-        let serialized_context_u64 = vec_u8_to_vec_u64(serialized_context);
-
-        vec_values_u64.push(serialized_context_u64);
+        //Will not panic, as PublicScContext is serializable
+        let context_public_info: Vec<u64> = context.produce_u64_list_from_context().unwrap();
+        vec_values_u64.push(context_public_info);
 
         let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
 
-        let (tweak, secret_r, commitment) = new_commitment_vec(vec_public_info, &secret_r);
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
             TransactionPayload {
@@ -260,7 +253,7 @@ impl NodeCore {
                 ephemeral_pub_key: eph_pub_key.to_vec(),
                 commitment,
                 tweak,
-                secret_r: secret_r.try_into().unwrap(),
+                secret_r,
             }
             .into(),
             result_hash,
@@ -305,8 +298,6 @@ impl NodeCore {
 
         // TODO: fix address when correspoding method will be added
         let sc_addr = "";
-        let mut rng = rand::thread_rng();
-        let secret_r: [u8; 32] = rng.gen();
 
         let sc_state = acc_map_read_guard
             .block_store
@@ -320,15 +311,13 @@ impl NodeCore {
 
         let context = acc_map_read_guard.produce_context(account.address);
 
-        let serialized_context = serde_json::to_vec(&context).unwrap();
-
-        let serialized_context_u64 = vec_u8_to_vec_u64(serialized_context);
-
-        vec_values_u64.push(serialized_context_u64);
+        //Will not panic, as PublicScContext is serializable
+        let context_public_info: Vec<u64> = context.produce_u64_list_from_context().unwrap();
+        vec_values_u64.push(context_public_info);
 
         let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
 
-        let (tweak, secret_r, commitment) = new_commitment_vec(vec_public_info, &secret_r);
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
             TransactionPayload {
@@ -349,7 +338,7 @@ impl NodeCore {
                 ephemeral_pub_key: eph_pub_key.to_vec(),
                 commitment,
                 tweak,
-                secret_r: secret_r.try_into().unwrap(),
+                secret_r,
             }
             .into(),
             result_hashes,
@@ -414,8 +403,6 @@ impl NodeCore {
 
         // TODO: fix address when correspoding method will be added
         let sc_addr = "";
-        let mut rng = rand::thread_rng();
-        let secret_r: [u8; 32] = rng.gen();
 
         let sc_state = acc_map_read_guard
             .block_store
@@ -429,15 +416,13 @@ impl NodeCore {
 
         let context = acc_map_read_guard.produce_context(account.address);
 
-        let serialized_context = serde_json::to_vec(&context).unwrap();
-
-        let serialized_context_u64 = vec_u8_to_vec_u64(serialized_context);
-
-        vec_values_u64.push(serialized_context_u64);
+        //Will not panic, as PublicScContext is serializable
+        let context_public_info: Vec<u64> = context.produce_u64_list_from_context().unwrap();
+        vec_values_u64.push(context_public_info);
 
         let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
 
-        let (tweak, secret_r, commitment) = new_commitment_vec(vec_public_info, &secret_r);
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
             TransactionPayload {
@@ -458,7 +443,7 @@ impl NodeCore {
                 ephemeral_pub_key: eph_pub_key.to_vec(),
                 commitment,
                 tweak,
-                secret_r: secret_r.try_into().unwrap(),
+                secret_r,
             }
             .into(),
             utxo_hashes,
@@ -551,8 +536,6 @@ impl NodeCore {
 
         // TODO: fix address when correspoding method will be added
         let sc_addr = "";
-        let mut rng = rand::thread_rng();
-        let secret_r: [u8; 32] = rng.gen();
 
         let sc_state = acc_map_read_guard
             .block_store
@@ -566,15 +549,13 @@ impl NodeCore {
 
         let context = acc_map_read_guard.produce_context(account.address);
 
-        let serialized_context = serde_json::to_vec(&context).unwrap();
-
-        let serialized_context_u64 = vec_u8_to_vec_u64(serialized_context);
-
-        vec_values_u64.push(serialized_context_u64);
+        //Will not panic, as PublicScContext is serializable
+        let context_public_info: Vec<u64> = context.produce_u64_list_from_context().unwrap();
+        vec_values_u64.push(context_public_info);
 
         let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
 
-        let (tweak, secret_r, commitment) = new_commitment_vec(vec_public_info, &secret_r);
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
             TransactionPayload {
@@ -595,7 +576,7 @@ impl NodeCore {
                 ephemeral_pub_key: eph_pub_key.to_vec(),
                 commitment,
                 tweak,
-                secret_r: secret_r.try_into().unwrap(),
+                secret_r,
             }
             .into(),
             utxo_hashes_receiver,
@@ -668,9 +649,6 @@ impl NodeCore {
         // TODO: fix address when correspoding method will be added
         let sc_addr = "";
 
-        let mut rng = rand::thread_rng();
-        let secret_r: [u8; 32] = rng.gen();
-
         let sc_state = acc_map_read_guard
             .block_store
             .get_sc_sc_state(sc_addr)
@@ -681,15 +659,15 @@ impl NodeCore {
             .map(|slice| vec_u8_to_vec_u64(slice.to_vec()))
             .collect();
 
-        let serialized_context_u64 = vec_u8_to_vec_u64(
-            serde_json::to_vec(&acc_map_read_guard.produce_context(account.address)).unwrap(),
-        );
+        let context = acc_map_read_guard.produce_context(account.address);
 
-        vec_values_u64.push(serialized_context_u64);
+        //Will not panic, as PublicScContext is serializable
+        let context_public_info: Vec<u64> = context.produce_u64_list_from_context().unwrap();
+        vec_values_u64.push(context_public_info);
 
         let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
 
-        let (tweak, secret_r, commitment) = new_commitment_vec(vec_public_info, &secret_r);
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
             TransactionPayload {
@@ -716,7 +694,7 @@ impl NodeCore {
                 ephemeral_pub_key: eph_pub_key.to_vec(),
                 commitment,
                 tweak,
-                secret_r: secret_r.try_into().unwrap(),
+                secret_r,
             }
             .into(),
             utxo_hashes,
@@ -753,8 +731,6 @@ impl NodeCore {
 
         // TODO: fix address when correspoding method will be added
         let sc_addr = "";
-        let mut rng = rand::thread_rng();
-        let secret_r: [u8; 32] = rng.gen();
 
         let sc_state = acc_map_read_guard
             .block_store
@@ -768,15 +744,13 @@ impl NodeCore {
 
         let context = acc_map_read_guard.produce_context(account.address);
 
-        let serialized_context = serde_json::to_vec(&context).unwrap();
-
-        let serialized_context_u64 = vec_u8_to_vec_u64(serialized_context);
-
-        vec_values_u64.push(serialized_context_u64);
+        //Will not panic, as PublicScContext is serializable
+        let context_public_info: Vec<u64> = context.produce_u64_list_from_context().unwrap();
+        vec_values_u64.push(context_public_info);
 
         let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
 
-        let (tweak, secret_r, commitment) = new_commitment_vec(vec_public_info, &secret_r);
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok(TransactionPayload {
             tx_kind: TxKind::Deshielded,
@@ -796,7 +770,7 @@ impl NodeCore {
             ephemeral_pub_key: vec![],
             commitment,
             tweak,
-            secret_r: secret_r.try_into().unwrap(),
+            secret_r,
         }
         .into())
     }
@@ -862,6 +836,17 @@ impl NodeCore {
         //Considering proof time, needs to be done before proof
         let tx_roots = self.get_roots().await;
 
+        let public_context = {
+            let read_guard = self.storage.read().await;
+
+            read_guard.produce_context(acc)
+        };
+
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(
+            //Will not panic, as public context is serializable
+            public_context.produce_u64_list_from_context().unwrap(),
+        );
+
         let tx: Transaction =
             sc_core::transaction_payloads_tools::create_public_transaction_payload(
                 serde_json::to_vec(&ActionData::MintMoneyPublicTx(MintMoneyPublicTx {
@@ -869,6 +854,9 @@ impl NodeCore {
                     amount,
                 }))
                 .unwrap(),
+                commitment,
+                tweak,
+                secret_r,
             )
             .into();
         tx.log();
@@ -1367,8 +1355,6 @@ impl NodeCore {
 
         // TODO: fix address when correspoding method will be added
         let sc_addr = "";
-        let mut rng = rand::thread_rng();
-        let secret_r: [u8; 32] = rng.gen();
 
         let sc_state = acc_map_read_guard
             .block_store
@@ -1382,15 +1368,13 @@ impl NodeCore {
 
         let context = acc_map_read_guard.produce_context(account.address);
 
-        let serialized_context = serde_json::to_vec(&context).unwrap();
-
-        let serialized_context_u64 = vec_u8_to_vec_u64(serialized_context);
-
-        vec_values_u64.push(serialized_context_u64);
+        //Will not panic, as PublicScContext is serializable
+        let context_public_info: Vec<u64> = context.produce_u64_list_from_context().unwrap();
+        vec_values_u64.push(context_public_info);
 
         let vec_public_info: Vec<u64> = vec_values_u64.into_iter().flatten().collect();
 
-        let (tweak, secret_r, commitment) = new_commitment_vec(vec_public_info, &secret_r);
+        let (tweak, secret_r, commitment) = pedersen_commitment_vec(vec_public_info);
 
         Ok((
             TransactionPayload {
@@ -1412,7 +1396,7 @@ impl NodeCore {
                 ephemeral_pub_key: eph_pub_key.to_vec(),
                 commitment,
                 tweak,
-                secret_r: secret_r.try_into().unwrap(),
+                secret_r,
             }
             .into(),
             utxo_hashes,

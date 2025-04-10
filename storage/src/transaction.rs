@@ -1,5 +1,5 @@
 use log::info;
-use secp256k1_zkp::{rand, PedersenCommitment, Tweak};
+use secp256k1_zkp::{PedersenCommitment, Tweak};
 use serde::{Deserialize, Serialize};
 use sha2::{digest::FixedOutput, Digest};
 
@@ -90,8 +90,6 @@ impl From<TransactionPayload> for Transaction {
 
         let hash = <TreeHashType>::from(hasher.finalize_fixed());
 
-        let mut rng = rand::thread_rng();
-
         Self {
             hash,
             tx_kind: value.tx_kind,
@@ -104,8 +102,8 @@ impl From<TransactionPayload> for Transaction {
             encoded_data: value.encoded_data,
             ephemeral_pub_key: value.ephemeral_pub_key,
             commitment: value.commitment,
-            tweak: Tweak::new(&mut rng),
-            secret_r: [0; 32],
+            tweak: value.tweak,
+            secret_r: value.secret_r,
         }
     }
 }
