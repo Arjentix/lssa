@@ -1,4 +1,4 @@
-use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, Key, KeyInit};
+use aes_gcm::{aead::Aead, AeadCore, Aes256Gcm, KeyInit};
 use elliptic_curve::point::AffineCoordinates;
 use elliptic_curve::PrimeField;
 use k256::{AffinePoint, FieldBytes, Scalar};

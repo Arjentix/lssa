@@ -1,4 +1,4 @@
-use aes_gcm::{aead::Aead, Aes256Gcm, Key, KeyInit};
+use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
 use common::merkle_tree_public::TreeHashType;
 use constants_types::{CipherText, Nonce};
 use elliptic_curve::point::AffineCoordinates;
@@ -102,17 +102,15 @@ impl AddressKeyHolder {
 
 #[cfg(test)]
 mod tests {
-    use std::io::Read;
-
     use aes_gcm::{
         aead::{Aead, KeyInit, OsRng},
         Aes256Gcm,
     };
     use constants_types::{CipherText, Nonce};
     use constants_types::{NULLIFIER_SECRET_CONST, VIEWING_SECRET_CONST};
+    use elliptic_curve::ff::Field;
     use elliptic_curve::group::prime::PrimeCurveAffine;
     use elliptic_curve::point::AffineCoordinates;
-    use elliptic_curve::{ff::Field, PrimeField};
     use k256::{AffinePoint, ProjectivePoint, Scalar};
 
     use super::*;
@@ -137,7 +135,7 @@ mod tests {
 
         // Generate a random ephemeral public key sender
         let scalar = Scalar::random(&mut OsRng);
-        let ephemeral_public_key_sender = (ProjectivePoint::GENERATOR * scalar).to_affine();
+        let ephemeral_public_key_sender = (ProjectivePoint::generator() * scalar).to_affine();
 
         // Calculate shared secret
         let shared_secret =
@@ -219,15 +217,8 @@ mod tests {
         let shared_secret =
             address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
 
-        // Prepare the encryption key from shared secret
-        let key_raw = serde_json::to_vec(&shared_secret).unwrap();
-        let key_raw_adjust_pre = &key_raw.as_slice()[..32];
-        let key_raw_adjust: [u8; 32] = key_raw_adjust_pre.try_into().unwrap();
-        let key: Key<Aes256Gcm> = key_raw_adjust.into();
-
-        let cipher = Aes256Gcm::new(&key);
-
         // Encrypt sample data with a specific nonce
+        let cipher = Aes256Gcm::new(&shared_secret.x());
         let nonce = Nonce::from_slice(b"unique nonce");
         let plaintext = b"Sensitive data";
         let ciphertext = cipher
@@ -259,15 +250,8 @@ mod tests {
         let shared_secret =
             address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
 
-        // Prepare the encryption key from shared secret
-        let key_raw = serde_json::to_vec(&shared_secret).unwrap();
-        let key_raw_adjust_pre = &key_raw.as_slice()[..32];
-        let key_raw_adjust: [u8; 32] = key_raw_adjust_pre.try_into().unwrap();
-        let key: Key<Aes256Gcm> = key_raw_adjust.into();
-
-        let cipher = Aes256Gcm::new(&key);
-
         // Encrypt sample data
+        let cipher = Aes256Gcm::new(&shared_secret.x());
         let nonce = Nonce::from_slice(b"unique nonce");
         let plaintext = b"Sensitive data";
         let ciphertext = cipher
