@@ -105,11 +105,9 @@ impl NodeChainStore {
                     .collect(),
             )?;
 
-            let eph_key_compressed = serde_json::to_vec(&tx.ephemeral_pub_key);
-
-            if let Ok(eph_key_compressed) = eph_key_compressed {
+            if !tx.encoded_data.is_empty() {
                 let ephemeral_public_key_sender =
-                    serde_json::from_slice::<AffinePoint>(&eph_key_compressed)?;
+                    serde_json::from_slice::<AffinePoint>(&tx.ephemeral_pub_key)?;
 
                 for (ciphertext, nonce, tag) in tx.encoded_data.clone() {
                     let slice = nonce.as_slice();
