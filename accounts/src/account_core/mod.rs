@@ -1,10 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use common::{
-    merkle_tree_public::TreeHashType,
-    transaction::Tag,
-};
+use common::{merkle_tree_public::TreeHashType, transaction::Tag};
 use k256::AffinePoint;
 use log::info;
 use serde::Serialize;
