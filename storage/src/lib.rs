@@ -535,11 +535,7 @@ impl RocksDBIO {
     pub fn put_snapshot_account_db(&self, account: Vec<u8>) -> DbResult<()> {
         let cf_snapshot = self.snapshot_column();
         self.db
-            .put_cf(
-                &cf_snapshot,
-                DB_SNAPSHOT_ACCOUNT_KEY.as_bytes(),
-                account,
-            )
+            .put_cf(&cf_snapshot, DB_SNAPSHOT_ACCOUNT_KEY.as_bytes(), account)
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
         Ok(())
     }
