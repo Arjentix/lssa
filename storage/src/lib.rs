@@ -403,6 +403,41 @@ impl RocksDBIO {
 
         Ok(data_blob_list)
     }
+
+    pub fn get_snapshot_block_id(&self) -> DbResult<u64> {
+        let cf_snapshot = self.snapshot_column();
+        let res = self
+            .db
+            .get_cf(&cf_snapshot, DB_SNAPSHOT_BLOCK_ID_KEY)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(u64::from_be_bytes(data.try_into().unwrap()))
+        } else {
+            Err(DbError::db_interaction_error(
+                "Snapshot block ID not found".to_string(),
+            ))
+        }
+    }
+
+    pub fn get_snapshot_commitment(&self) -> DbResult<Vec<u8>> {
+        let cf_snapshot = self.snapshot_column();
+        let res = self
+            .db
+            .get_cf(&cf_snapshot, DB_SNAPSHOT_COMMITMENT_KEY)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(data)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Snapshot commitment not found".to_string(),
+            ))
+        }
+    }
+
+
+
 }
 
 ///Creates address for sc data blob at corresponding id
