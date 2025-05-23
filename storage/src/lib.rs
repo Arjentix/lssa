@@ -468,6 +468,22 @@ impl RocksDBIO {
         }
     }
 
+    pub fn get_snapshot_account(&self) -> DbResult<Vec<u8>> {
+        let cf_snapshot = self.snapshot_column();
+        let res = self
+            .db
+            .get_cf(&cf_snapshot, DB_SNAPSHOT_ACCOUNT_KEY)
+            .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))?;
+
+        if let Some(data) = res {
+            Ok(data)
+        } else {
+            Err(DbError::db_interaction_error(
+                "Snapshot account not found".to_string(),
+            ))
+        }
+    }
+
 }
 
 ///Creates address for sc data blob at corresponding id
