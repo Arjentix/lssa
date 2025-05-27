@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use common::{merkle_tree_public::TreeHashType, nullifier::UTXONullifier, transaction::Tag};
+use common::{merkle_tree_public::TreeHashType, transaction::Tag};
 use k256::AffinePoint;
 use log::info;
 use serde::Serialize;
@@ -84,19 +84,6 @@ impl Account {
             .decrypt_data(ephemeral_public_key_sender, ciphertext, nonce)
     }
 
-    pub fn mark_spent_utxo(
-        &mut self,
-        utxo_nullifier_map: HashMap<TreeHashType, UTXONullifier>,
-    ) -> Result<()> {
-        for (hash, nullifier) in utxo_nullifier_map {
-            if let Some(utxo_entry) = self.utxos.get_mut(&hash) {
-                utxo_entry.consume_utxo(nullifier)?;
-            }
-        }
-
-        Ok(())
-    }
-
     pub fn add_new_utxo_outputs(&mut self, utxos: Vec<UTXO>) -> Result<()> {
         for utxo in utxos {
             if self.utxos.contains_key(&utxo.hash) {
@@ -162,10 +149,6 @@ impl Default for Account {
 mod tests {
     use super::*;
 
-    fn generate_dummy_utxo_nullifier() -> UTXONullifier {
-        UTXONullifier::default()
-    }
-
     fn generate_dummy_utxo(address: TreeHashType, amount: u128) -> anyhow::Result<UTXO> {
         let payload = UTXOPayload {
             owner: address,
@@ -182,20 +165,6 @@ mod tests {
 
         assert_eq!(account.balance, 0);
         assert!(account.key_holder.address != [0u8; 32]); // Check if the address is not empty
-    }
-
-    #[test]
-    fn test_mark_spent_utxo() {
-        let mut account = Account::new();
-        let utxo = generate_dummy_utxo(account.address, 100).unwrap();
-        account.add_new_utxo_outputs(vec![utxo]).unwrap();
-
-        let mut utxo_nullifier_map = HashMap::new();
-        utxo_nullifier_map.insert(account.address, generate_dummy_utxo_nullifier());
-
-        let result = account.mark_spent_utxo(utxo_nullifier_map);
-
-        assert!(result.is_ok());
     }
 
     #[test]
