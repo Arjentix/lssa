@@ -140,7 +140,8 @@ mod tests {
 
         let genesis_block = create_genesis_block();
         {
-            let node_store_old = NodeBlockStore::open_db_with_genesis(path, Some(genesis_block.clone())).unwrap();
+            let node_store_old =
+                NodeBlockStore::open_db_with_genesis(path, Some(genesis_block.clone())).unwrap();
 
             let block = create_sample_block(1, 0);
             node_store_old.put_block_at_id(block.clone()).unwrap();
