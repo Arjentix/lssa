@@ -1,7 +1,13 @@
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
+use accounts::account_core::Account;
 use anyhow::{anyhow, Result};
 use common::block::Block;
+use common::merkle_tree_public::merkle_tree::HashStorageMerkleTree;
+use common::nullifier::UTXONullifier;
+use common::transaction::Transaction;
+use common::utxo_commitment::UTXOCommitment;
 use storage::sc_db_utils::{DataBlob, DataBlobChangeVariant};
 use storage::RocksDBIO;
 
