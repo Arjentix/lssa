@@ -27,9 +27,9 @@ impl NodeBlockStore {
     }
 
     ///Reopening existing database
-    pub fn open_db_restart(location: &Path) -> Result<Self> {
+    pub fn open_db_restart(location: &Path, genesis_block: Block) -> Result<Self> {
         NodeBlockStore::db_destroy(location)?;
-        NodeBlockStore::open_db_with_genesis(location, None)
+        NodeBlockStore::open_db_with_genesis(location, Some(genesis_block))
     }
 
     ///Reloading existing database
@@ -139,13 +139,25 @@ mod tests {
         let path = temp_dir.path();
 
         let genesis_block = create_genesis_block();
-        let _ = NodeBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
+        {
+            let node_store_old = NodeBlockStore::open_db_with_genesis(path, Some(genesis_block.clone())).unwrap();
+
+            let block = create_sample_block(1, 0);
+            node_store_old.put_block_at_id(block.clone()).unwrap();
+        }
+
+        // Check that the first block is still in the old database
+        {
+            let node_store_old = NodeBlockStore::open_db_reload(path).unwrap();
+            let result = node_store_old.get_block_at_id(1);
+            assert!(result.is_ok());
+        }
 
         // Restart the database
-        let node_store = NodeBlockStore::open_db_restart(path).unwrap();
+        let node_store = NodeBlockStore::open_db_restart(path, genesis_block).unwrap();
 
-        // The block should no longer be available since no genesis block is set on restart
-        let result = node_store.get_block_at_id(0);
+        // The block should no longer be available since no first block is set on restart
+        let result = node_store.get_block_at_id(1);
         assert!(result.is_err());
     }
 
