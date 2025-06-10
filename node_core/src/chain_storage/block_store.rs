@@ -2,6 +2,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use common::block::Block;
+use log::error;
 use storage::sc_db_utils::{DataBlob, DataBlobChangeVariant};
 use storage::RocksDBIO;
 
@@ -55,6 +56,38 @@ impl NodeBlockStore {
 
     pub fn get_sc_sc_state(&self, sc_addr: &str) -> Result<Vec<DataBlob>> {
         Ok(self.dbio.get_sc_sc_state(sc_addr)?)
+    }
+
+    pub fn put_snapshot_at_block_id(
+        &self,
+        id: u64,
+        accounts_ser: Vec<u8>,
+        comm_ser: Vec<u8>,
+        txs_ser: Vec<u8>,
+        nullifiers_ser: Vec<u8>,
+    ) -> Result<()> {
+        //Error notification for writing into DB error
+        self.dbio
+            .put_snapshot_block_id_db(id)
+            .inspect_err(|err| error!("Failed to store snapshot block id with error {err:#?}"))?;
+        self.dbio
+            .put_snapshot_account_db(accounts_ser)
+            .inspect_err(|err| error!("Failed to store snapshot accounts with error {err:#?}"))?;
+        self.dbio
+            .put_snapshot_commitement_db(comm_ser)
+            .inspect_err(|err| {
+                error!("Failed to store snapshot commitments with error {err:#?}")
+            })?;
+        self.dbio
+            .put_snapshot_transaction_db(txs_ser)
+            .inspect_err(|err| {
+                error!("Failed to store snapshot transactions with error {err:#?}")
+            })?;
+        self.dbio
+            .put_snapshot_nullifier_db(nullifiers_ser)
+            .inspect_err(|err| error!("Failed to store snapshot nullifiers with error {err:#?}"))?;
+
+        Ok(())
     }
 }
 
@@ -158,5 +191,42 @@ mod tests {
 
         let result = node_store.get_block_at_id(42);
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_put_snapshot_at_block_id() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let genesis_block = create_genesis_block();
+        let node_store = NodeBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
+
+        let id = 3;
+        let accounts_ser = vec![1, 2, 3, 4];
+        let comm_ser = vec![5, 6, 7, 8];
+        let txs_ser = vec![9, 10, 11, 12];
+        let nullifiers_ser = vec![13, 14, 15, 16];
+
+        node_store
+            .put_snapshot_at_block_id(
+                id,
+                accounts_ser.clone(),
+                comm_ser.clone(),
+                txs_ser.clone(),
+                nullifiers_ser.clone(),
+            )
+            .unwrap();
+
+        assert_eq!(node_store.dbio.get_snapshot_block_id().unwrap(), id);
+        assert_eq!(
+            node_store.dbio.get_snapshot_account().unwrap(),
+            accounts_ser
+        );
+        assert_eq!(node_store.dbio.get_snapshot_commitment().unwrap(), comm_ser);
+        assert_eq!(node_store.dbio.get_snapshot_transaction().unwrap(), txs_ser);
+        assert_eq!(
+            node_store.dbio.get_snapshot_nullifier().unwrap(),
+            nullifiers_ser
+        );
     }
 }
