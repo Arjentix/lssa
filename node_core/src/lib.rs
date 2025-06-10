@@ -98,7 +98,7 @@ impl NodeCore {
 
         let genesis_block = client.get_block(genesis_id.genesis_id).await?.block;
 
-        let (mut storage, mut chain_height) = NodeChainStore::new(&config.home, genesis_block)?;
+        let (mut storage, mut chain_height) = NodeChainStore::new(config.clone(), genesis_block)?;
 
         pre_start::setup_empty_sc_states(&storage).await?;
 

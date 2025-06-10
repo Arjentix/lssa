@@ -30,7 +30,7 @@ pub struct NodeChainStore {
 }
 
 impl NodeChainStore {
-    pub fn new(home_dir: &Path, genesis_block: Block) -> Result<(Self, u64)> {
+    pub fn new(config: NodeConfig, genesis_block: Block) -> Result<(Self, u64)> {
         let mut acc_map = HashMap::new();
         let mut nullifier_store = HashSet::new();
         let mut utxo_commitments_store = UTXOCommitmentsMerkleTree::new(vec![]);
@@ -58,6 +58,7 @@ impl NodeChainStore {
                 nullifier_store,
                 utxo_commitments_store,
                 pub_tx_store,
+                node_config: config,
             },
             block_id,
         ))

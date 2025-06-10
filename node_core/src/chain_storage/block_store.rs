@@ -88,6 +88,8 @@ impl NodeBlockStore {
         Ok(serde_json::from_slice(
             &self.dbio.get_snapshot_transaction()?,
         )?)
+    }
+
     pub fn put_snapshot_at_block_id(
         &self,
         id: u64,
