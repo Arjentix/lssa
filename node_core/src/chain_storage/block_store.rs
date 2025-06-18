@@ -1,10 +1,18 @@
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
+use accounts::account_core::Account;
 use anyhow::{anyhow, Result};
 use common::block::Block;
+use common::merkle_tree_public::merkle_tree::HashStorageMerkleTree;
+use common::nullifier::UTXONullifier;
+use common::transaction::Transaction;
+use common::utxo_commitment::UTXOCommitment;
 use log::error;
 use storage::sc_db_utils::{DataBlob, DataBlobChangeVariant};
 use storage::RocksDBIO;
+
+use crate::chain_storage::AccMap;
 
 pub struct NodeBlockStore {
     dbio: RocksDBIO,
@@ -22,9 +30,9 @@ impl NodeBlockStore {
     }
 
     ///Reopening existing database
-    pub fn open_db_restart(location: &Path) -> Result<Self> {
+    pub fn open_db_restart(location: &Path, genesis_block: Block) -> Result<Self> {
         NodeBlockStore::db_destroy(location)?;
-        NodeBlockStore::open_db_with_genesis(location, None)
+        NodeBlockStore::open_db_with_genesis(location, Some(genesis_block))
     }
 
     ///Reloading existing database
@@ -56,6 +64,33 @@ impl NodeBlockStore {
 
     pub fn get_sc_sc_state(&self, sc_addr: &str) -> Result<Vec<DataBlob>> {
         Ok(self.dbio.get_sc_sc_state(sc_addr)?)
+    }
+
+    pub fn get_snapshot_block_id(&self) -> Result<u64> {
+        Ok(self.dbio.get_snapshot_block_id()?)
+    }
+
+    pub fn get_snapshot_account(&self) -> Result<HashMap<[u8; 32], Account>> {
+        let temp: AccMap = serde_json::from_slice(&self.dbio.get_snapshot_account()?)?;
+        Ok(temp.into())
+    }
+
+    pub fn get_snapshot_commitment(&self) -> Result<HashStorageMerkleTree<UTXOCommitment>> {
+        Ok(serde_json::from_slice(
+            &self.dbio.get_snapshot_commitment()?,
+        )?)
+    }
+
+    pub fn get_snapshot_nullifier(&self) -> Result<HashSet<UTXONullifier>> {
+        Ok(serde_json::from_slice(
+            &self.dbio.get_snapshot_nullifier()?,
+        )?)
+    }
+
+    pub fn get_snapshot_transaction(&self) -> Result<HashStorageMerkleTree<Transaction>> {
+        Ok(serde_json::from_slice(
+            &self.dbio.get_snapshot_transaction()?,
+        )?)
     }
 
     pub fn put_snapshot_at_block_id(
@@ -140,13 +175,26 @@ mod tests {
         let path = temp_dir.path();
 
         let genesis_block = create_genesis_block();
-        let _ = NodeBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
+        {
+            let node_store_old =
+                NodeBlockStore::open_db_with_genesis(path, Some(genesis_block.clone())).unwrap();
+
+            let block = create_sample_block(1, 0);
+            node_store_old.put_block_at_id(block.clone()).unwrap();
+        }
+
+        // Check that the first block is still in the old database
+        {
+            let node_store_old = NodeBlockStore::open_db_reload(path).unwrap();
+            let result = node_store_old.get_block_at_id(1);
+            assert!(result.is_ok());
+        }
 
         // Restart the database
-        let node_store = NodeBlockStore::open_db_restart(path).unwrap();
+        let node_store = NodeBlockStore::open_db_restart(path, genesis_block).unwrap();
 
-        // The block should no longer be available since no genesis block is set on restart
-        let result = node_store.get_block_at_id(0);
+        // The block should no longer be available since no first block is set on restart
+        let result = node_store.get_block_at_id(1);
         assert!(result.is_err());
     }
 
@@ -180,17 +228,6 @@ mod tests {
         let retrieved_block = node_store.get_block_at_id(1).unwrap();
         assert_eq!(retrieved_block.block_id, block.block_id);
         assert_eq!(retrieved_block.hash, block.hash);
-    }
-
-    #[test]
-    fn test_get_block_not_found() {
-        let temp_dir = tempdir().unwrap();
-        let path = temp_dir.path();
-
-        let node_store = NodeBlockStore::open_db_with_genesis(path, None).unwrap();
-
-        let result = node_store.get_block_at_id(42);
-        assert!(result.is_err());
     }
 
     #[test]

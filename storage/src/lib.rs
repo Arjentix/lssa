@@ -2,7 +2,6 @@ use std::{path::Path, sync::Arc};
 
 use common::block::Block;
 use error::DbError;
-use log::warn;
 use rocksdb::{
     BoundColumnFamily, ColumnFamilyDescriptor, DBWithThreadMode, MultiThreaded, Options,
 };
@@ -103,9 +102,8 @@ impl RocksDBIO {
 
             Ok(dbio)
         } else {
-            warn!("Starting db in unset mode, will have to set starting block manually");
-
-            Ok(dbio)
+            // Here we are trying to start a DB without a block, one should not do it.
+            unreachable!()
         }
     }
 
@@ -124,19 +122,19 @@ impl RocksDBIO {
             .map_err(|rerr| DbError::rocksdb_cast_message(rerr, None))
     }
 
-    pub fn meta_column(&self) -> Arc<BoundColumnFamily> {
+    pub fn meta_column(&self) -> Arc<BoundColumnFamily<'_>> {
         self.db.cf_handle(CF_META_NAME).unwrap()
     }
 
-    pub fn block_column(&self) -> Arc<BoundColumnFamily> {
+    pub fn block_column(&self) -> Arc<BoundColumnFamily<'_>> {
         self.db.cf_handle(CF_BLOCK_NAME).unwrap()
     }
 
-    pub fn sc_column(&self) -> Arc<BoundColumnFamily> {
+    pub fn sc_column(&self) -> Arc<BoundColumnFamily<'_>> {
         self.db.cf_handle(CF_SC_NAME).unwrap()
     }
 
-    pub fn snapshot_column(&self) -> Arc<BoundColumnFamily> {
+    pub fn snapshot_column(&self) -> Arc<BoundColumnFamily<'_>> {
         self.db.cf_handle(CF_SNAPSHOT_NAME).unwrap()
     }
 
