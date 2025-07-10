@@ -26,7 +26,6 @@ pub enum TxKind {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 ///General transaction object
 pub struct Transaction {
-    pub hash: TreeHashType,
     pub tx_kind: TxKind,
     ///Tx input data (public part)
     pub execution_input: Vec<u8>,
@@ -56,6 +55,15 @@ pub struct Transaction {
     ///
     /// First value represents vector of changes, second is new length of a state
     pub state_changes: (serde_json::Value, usize),
+}
+
+impl Transaction {
+    pub fn hash(&self) -> TreeHashType {
+        let raw_data = serde_json::to_vec(&self).unwrap();
+        let mut hasher = sha2::Sha256::new();
+        hasher.update(&raw_data);
+        TreeHashType::from(hasher.finalize_fixed())
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -94,16 +102,7 @@ pub struct TransactionPayload {
 
 impl From<TransactionPayload> for Transaction {
     fn from(value: TransactionPayload) -> Self {
-        let raw_data = serde_json::to_vec(&value).unwrap();
-
-        let mut hasher = sha2::Sha256::new();
-
-        hasher.update(&raw_data);
-
-        let hash = <TreeHashType>::from(hasher.finalize_fixed());
-
         Self {
-            hash,
             tx_kind: value.tx_kind,
             execution_input: value.execution_input,
             execution_output: value.execution_output,
@@ -217,7 +216,7 @@ impl ActionData {
 
 impl Transaction {
     pub fn log(&self) {
-        info!("Transaction hash is {:?}", hex::encode(self.hash));
+        info!("Transaction hash is {:?}", hex::encode(self.hash()));
         info!("Transaction tx_kind is {:?}", self.tx_kind);
         info!("Transaction execution_input is {:?}", {
             if let Ok(action) = serde_json::from_slice::<ActionData>(&self.execution_input) {

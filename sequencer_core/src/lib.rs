@@ -75,7 +75,6 @@ impl SequencerCore {
         tx_roots: [[u8; 32]; 2],
     ) -> Result<(), TransactionMalformationErrorKind> {
         let Transaction {
-            hash,
             tx_kind,
             ref execution_input,
             ref execution_output,
@@ -87,7 +86,7 @@ impl SequencerCore {
         let mempool_size = self.mempool.len();
 
         if mempool_size >= self.sequencer_config.max_num_tx_in_block {
-            return Err(TransactionMalformationErrorKind::MempoolFullForRound { tx: *hash });
+            return Err(TransactionMalformationErrorKind::MempoolFullForRound { tx: tx.hash() });
         }
 
         let curr_sequencer_roots = self.get_tree_roots();
@@ -95,7 +94,7 @@ impl SequencerCore {
         if tx_roots != curr_sequencer_roots {
             return Err(
                 TransactionMalformationErrorKind::ChainStateFurtherThanTransactionState {
-                    tx: *hash,
+                    tx: tx.hash(),
                 },
             );
         }
@@ -109,7 +108,7 @@ impl SequencerCore {
                     //Public transactions can not make private operations.
                     return Err(
                         TransactionMalformationErrorKind::PublicTransactionChangedPrivateData {
-                            tx: *hash,
+                            tx: tx.hash(),
                         },
                     );
                 }
@@ -121,7 +120,7 @@ impl SequencerCore {
                     //between public and private state.
                     return Err(
                         TransactionMalformationErrorKind::PrivateTransactionChangedPublicData {
-                            tx: *hash,
+                            tx: tx.hash(),
                         },
                     );
                 }
@@ -130,7 +129,7 @@ impl SequencerCore {
         };
 
         //Tree checks
-        let tx_tree_check = self.store.pub_tx_store.get_tx(*hash).is_some();
+        let tx_tree_check = self.store.pub_tx_store.get_tx(tx.hash()).is_some();
         let nullifier_tree_check = nullifier_created_hashes
             .iter()
             .map(|nullifier_hash| {
@@ -150,18 +149,18 @@ impl SequencerCore {
             .any(|check| check);
 
         if tx_tree_check {
-            return Err(TransactionMalformationErrorKind::TxHashAlreadyPresentInTree { tx: *hash });
+            return Err(TransactionMalformationErrorKind::TxHashAlreadyPresentInTree { tx: tx.hash() });
         }
 
         if nullifier_tree_check {
             return Err(
-                TransactionMalformationErrorKind::NullifierAlreadyPresentInTree { tx: *hash },
+                TransactionMalformationErrorKind::NullifierAlreadyPresentInTree { tx: tx.hash() },
             );
         }
 
         if utxo_commitments_check {
             return Err(
-                TransactionMalformationErrorKind::UTXOCommitmentAlreadyPresentInTree { tx: *hash },
+                TransactionMalformationErrorKind::UTXOCommitmentAlreadyPresentInTree { tx: tx.hash() },
             );
         }
 
@@ -185,8 +184,6 @@ impl SequencerCore {
         tx: TransactionMempool,
     ) -> Result<(), TransactionMalformationErrorKind> {
         let Transaction {
-            // ToDo: remove hashing of transactions on node side [Issue #66]
-            hash: _,
             ref utxo_commitments_created_hashes,
             ref nullifier_created_hashes,
             ..
@@ -280,7 +277,6 @@ mod tests {
     }
 
     fn create_dummy_transaction(
-        hash: TreeHashType,
         nullifier_created_hashes: Vec<[u8; 32]>,
         utxo_commitments_spent_hashes: Vec<[u8; 32]>,
         utxo_commitments_created_hashes: Vec<[u8; 32]>,
@@ -288,7 +284,6 @@ mod tests {
         let mut rng = rand::thread_rng();
 
         Transaction {
-            hash,
             tx_kind: TxKind::Private,
             execution_input: vec![],
             execution_output: vec![],
@@ -306,8 +301,8 @@ mod tests {
         }
     }
 
-    fn common_setup(mut sequencer: &mut SequencerCore) {
-        let tx = create_dummy_transaction([12; 32], vec![[9; 32]], vec![[7; 32]], vec![[8; 32]]);
+    fn common_setup(sequencer: &mut SequencerCore) {
+        let tx = create_dummy_transaction(vec![[9; 32]], vec![[7; 32]], vec![[8; 32]]);
         let tx_mempool = TransactionMempool { tx };
         sequencer.mempool.push_item(tx_mempool);
 
@@ -342,7 +337,7 @@ mod tests {
 
         common_setup(&mut sequencer);
 
-        let tx = create_dummy_transaction([1; 32], vec![[91; 32]], vec![[71; 32]], vec![[81; 32]]);
+        let tx = create_dummy_transaction(vec![[91; 32]], vec![[71; 32]], vec![[81; 32]]);
         let tx_roots = sequencer.get_tree_roots();
         let result = sequencer.transaction_pre_check(&tx, tx_roots);
 
@@ -359,7 +354,7 @@ mod tests {
 
         common_setup(&mut sequencer);
 
-        let tx = create_dummy_transaction([2; 32], vec![[92; 32]], vec![[72; 32]], vec![[82; 32]]);
+        let tx = create_dummy_transaction(vec![[92; 32]], vec![[72; 32]], vec![[82; 32]]);
         let tx_roots = sequencer.get_tree_roots();
 
         // Fill the mempool
@@ -381,7 +376,7 @@ mod tests {
 
         common_setup(&mut sequencer);
 
-        let tx = create_dummy_transaction([3; 32], vec![[93; 32]], vec![[73; 32]], vec![[83; 32]]);
+        let tx = create_dummy_transaction(vec![[93; 32]], vec![[73; 32]], vec![[83; 32]]);
         let tx_roots = sequencer.get_tree_roots();
         let tx_mempool = TransactionMempool { tx };
 
@@ -395,7 +390,7 @@ mod tests {
         let config = setup_sequencer_config();
         let mut sequencer = SequencerCore::start_from_config(config);
 
-        let tx = create_dummy_transaction([4; 32], vec![[94; 32]], vec![[7; 32]], vec![[8; 32]]);
+        let tx = create_dummy_transaction(vec![[94; 32]], vec![[7; 32]], vec![[8; 32]]);
         let tx_mempool = TransactionMempool { tx };
         sequencer.mempool.push_item(tx_mempool);
 
