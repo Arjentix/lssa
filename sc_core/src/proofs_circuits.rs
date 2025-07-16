@@ -5,6 +5,8 @@ use secp256k1_zkp::{CommitmentSecrets, Generator, PedersenCommitment, Tag, Tweak
 use sha2::{Digest, Sha256};
 use utxo::utxo_core::UTXO;
 
+//
+
 use crate::{cryptography::poseidon_hash, public_context::PublicSCContext};
 
 fn hash(input: &[u8]) -> Vec<u8> {
