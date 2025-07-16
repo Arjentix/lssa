@@ -78,6 +78,7 @@ impl SequencerCore {
         let tx = tx
             .into_authenticated()
             .map_err(|_| TransactionMalformationErrorKind::InvalidSignature)?;
+
         let TransactionBody {
             tx_kind,
             ref execution_input,
@@ -87,12 +88,7 @@ impl SequencerCore {
             ..
         } = tx.body();
 
-        let mempool_size = self.mempool.len();
         let tx_hash = *tx.hash();
-
-        if mempool_size >= self.sequencer_config.max_num_tx_in_block {
-            return Err(TransactionMalformationErrorKind::MempoolFullForRound { tx: tx_hash });
-        }
 
         let curr_sequencer_roots = self.get_tree_roots();
 
@@ -178,12 +174,19 @@ impl SequencerCore {
 
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
-        item: SignedTransaction,
+        signed_tx: SignedTransaction,
         tx_roots: [[u8; 32]; 2],
     ) -> Result<(), TransactionMalformationErrorKind> {
-        let item = self.transaction_pre_check(item, tx_roots)?;
+        let mempool_size = self.mempool.len();
+        if mempool_size >= self.sequencer_config.max_num_tx_in_block {
+            return Err(TransactionMalformationErrorKind::MempoolFullForRound {
+                tx: signed_tx.body.hash(),
+            });
+        }
 
-        self.mempool.push_item(item.into());
+        let authenticated_tx = self.transaction_pre_check(signed_tx, tx_roots)?;
+
+        self.mempool.push_item(authenticated_tx.into());
 
         Ok(())
     }

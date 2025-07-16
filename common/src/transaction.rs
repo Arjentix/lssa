@@ -247,7 +247,6 @@ impl SignedTransaction {
     ) -> SignedTransaction {
         let hash = body.hash();
         let signature: Signature = private_key.sign(&hash);
-        // TODO: Implement actual signature over `hash`
         let public_key = VerifyingKey::from(&private_key);
         Self {
             body,
