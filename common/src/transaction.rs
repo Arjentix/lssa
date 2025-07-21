@@ -1,6 +1,6 @@
 use k256::{
     ecdsa::{
-        signature::{Signer, Verifier},
+        signature::hazmat::{PrehashSigner, PrehashVerifier},
         Signature, SigningKey, VerifyingKey,
     },
     EncodedPoint, Scalar,
@@ -245,7 +245,7 @@ impl Transaction {
     /// The signature is generated over the hash of the body as computed by `body.hash()`
     pub fn new(body: TransactionBody, private_key: SigningKey) -> Transaction {
         let hash = body.hash();
-        let signature: TransactionSignature = private_key.sign(&hash);
+        let signature: TransactionSignature = private_key.sign_prehash(&hash).unwrap();
         let public_key = VerifyingKey::from(&private_key);
         Self {
             body,
@@ -260,7 +260,7 @@ impl Transaction {
         let hash = self.body.hash();
 
         self.public_key
-            .verify(&hash, &self.signature)
+            .verify_prehash(&hash, &self.signature)
             .map_err(|_| TransactionSignatureError::InvalidSignature)?;
 
         Ok(AuthenticatedTransaction {
@@ -299,7 +299,7 @@ impl AuthenticatedTransaction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use k256::FieldBytes;
+    use k256::{ecdsa::signature::Signer, FieldBytes};
     use secp256k1_zkp::{constants::SECRET_KEY_SIZE, Tweak};
     use sha2::{digest::FixedOutput, Digest};
 
@@ -384,7 +384,7 @@ mod tests {
         assert!(authenticated_tx
             .transaction()
             .public_key
-            .verify(hash, &signature)
+            .verify_prehash(hash, &signature)
             .is_ok());
     }
 
