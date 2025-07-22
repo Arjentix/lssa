@@ -15,7 +15,7 @@ pub type CipherText = Vec<u8>;
 pub type Nonce = GenericArray<u8, UInt<UInt<UInt<UInt<UTerm, B1>, B1>, B0>, B0>>;
 pub type Tag = u8;
 
-#[derive(Debug, Serialize, Deserialize, Clone, Copy)]
+#[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
 pub enum TxKind {
     Public,
     Private,
@@ -23,7 +23,7 @@ pub enum TxKind {
     Deshielded,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
 ///General transaction object
 pub struct Transaction {
     pub tx_kind: TxKind,

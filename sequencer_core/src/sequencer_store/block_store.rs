@@ -70,3 +70,61 @@ fn block_to_transactions_map(block: &Block) -> HashMap<TreeHashType, u64> {
         .map(|transaction| (transaction.hash(), block.block_id))
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+
+    fn create_genesis_block_with_transaction() -> (Block, Transaction) {
+        let tx = Transaction {
+            tx_kind: common::transaction::TxKind::Public,
+            execution_input: Default::default(),
+            execution_output: Default::default(),
+            utxo_commitments_spent_hashes: Default::default(),
+            utxo_commitments_created_hashes: Default::default(),
+            nullifier_created_hashes: Default::default(),
+            execution_proof_private: Default::default(),
+            encoded_data: Default::default(),
+            ephemeral_pub_key: Default::default(),
+            commitment: Default::default(),
+            tweak: Default::default(),
+            secret_r: Default::default(),
+            sc_addr: Default::default(),
+            state_changes: Default::default(),
+        };
+        (
+            Block {
+                block_id: 0,
+                prev_block_id: 0,
+                prev_block_hash: [0; 32],
+                hash: [1; 32],
+                transactions: vec![tx.clone()],
+                data: vec![],
+            },
+            tx,
+        )
+    }
+
+    #[test]
+    fn test_get_transaction_by_hash_for_existing_transaction() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let (block, tx) = create_genesis_block_with_transaction();
+        let node_store = SequecerBlockStore::open_db_with_genesis(path, Some(block)).unwrap();
+        let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
+        assert_eq!(Some(tx), retrieved_tx);
+    }
+
+    #[test]
+    fn test_get_transaction_by_hash_for_non_existent_transaction() {
+        let temp_dir = tempdir().unwrap();
+        let path = temp_dir.path();
+
+        let (block, tx) = create_genesis_block_with_transaction();
+        let node_store = SequecerBlockStore::open_db_with_genesis(path, Some(block)).unwrap();
+        let retrieved_tx = node_store.get_transaction_by_hash([0; 32]);
+        assert_eq!(None, retrieved_tx);
+    }
+}
