@@ -148,7 +148,7 @@ impl JsonHandler {
     async fn process_get_account_balance(&self, request: Request) -> Result<Value, RpcErr> {
         let get_account_req = GetAccountBalanceRequest::parse(Some(request.params))?;
         let address = hex::decode(get_account_req.address)
-            .map_err(|_| RpcParseError("invalid address".to_string()))?;
+            .map_err(|_| RpcError::invalid_params("invalid address".to_string()))?;
 
         let balance = {
             let state = self.sequencer_state.lock().await;
@@ -166,10 +166,10 @@ impl JsonHandler {
     async fn process_get_transaction_by_hash(&self, request: Request) -> Result<Value, RpcErr> {
         let get_transaction_req = GetTransactionByHashRequest::parse(Some(request.params))?;
         let bytes: Vec<u8> = hex::decode(get_transaction_req.hash)
-            .map_err(|_| RpcParseError("invalid hash".to_string()))?;
+            .map_err(|_| RpcError::invalid_params("invalid hash".to_string()))?;
         let hash: TreeHashType = bytes
             .try_into()
-            .map_err(|_| RpcParseError("invalid hash".to_string()))?;
+            .map_err(|_| RpcError::invalid_params("invalid hash".to_string()))?;
 
         let transaction = {
             let state = self.sequencer_state.lock().await;
@@ -300,16 +300,9 @@ mod tests {
             "jsonrpc": "2.0",
             "id": 1,
             "error": {
-                "code": -32700,
-                "message": "Parse error",
-                "name": "REQUEST_VALIDATION_ERROR",
-                "data": "invalid address",
-                "cause": {
-                    "name": "PARSE_ERROR",
-                    "info": {
-                        "error_message": "invalid address"
-                    }
-                }
+                "code": -32602,
+                "message": "Invalid params",
+                "data": "invalid address"
             }
         });
         let response = call_rpc_handler_with_json(json_handler, request).await;
@@ -353,6 +346,30 @@ mod tests {
             "jsonrpc": "2.0",
             "result": {
                 "transaction": Value::Null
+            }
+        });
+
+        let response = call_rpc_handler_with_json(json_handler, request).await;
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[actix_web::test]
+    async fn test_get_transaction_by_hash_for_invalid_hash() {
+        let json_handler = json_handler_for_tests();
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "get_transaction_by_hash",
+            "params": { "hash": "not_a_valid_hex" },
+            "id": 1
+        });
+        let expected_response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+                "code": -32602,
+                "message": "Invalid params",
+                "data": "invalid hash"
             }
         });
 
