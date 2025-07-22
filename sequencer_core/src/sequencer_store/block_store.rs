@@ -49,6 +49,7 @@ impl SequecerBlockStore {
         Ok(())
     }
 
+    /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
     pub fn get_transaction_by_hash(&self, hash: TreeHashType) -> Option<Transaction> {
         let block_id = self.tx_hash_to_block_map.get(&hash);
         let block = block_id.map(|&id| self.get_block_at_id(id));
@@ -76,7 +77,7 @@ mod tests {
     use super::*;
     use tempfile::tempdir;
 
-    fn create_genesis_block_with_transaction() -> (Block, Transaction) {
+    fn create_dummy_block_with_transaction(block_id: u64) -> (Block, Transaction) {
         let tx = Transaction {
             tx_kind: common::transaction::TxKind::Public,
             execution_input: Default::default(),
@@ -95,8 +96,8 @@ mod tests {
         };
         (
             Block {
-                block_id: 0,
-                prev_block_id: 0,
+                block_id,
+                prev_block_id: block_id - 1,
                 prev_block_hash: [0; 32],
                 hash: [1; 32],
                 transactions: vec![tx.clone()],
@@ -107,24 +108,28 @@ mod tests {
     }
 
     #[test]
-    fn test_get_transaction_by_hash_for_existing_transaction() {
+    fn test_get_transaction_by_hash() {
         let temp_dir = tempdir().unwrap();
         let path = temp_dir.path();
-
-        let (block, tx) = create_genesis_block_with_transaction();
-        let node_store = SequecerBlockStore::open_db_with_genesis(path, Some(block)).unwrap();
+        let genesis_block = Block {
+            block_id: 0,
+            prev_block_id: 0,
+            prev_block_hash: [0; 32],
+            hash: [1; 32],
+            transactions: vec![],
+            data: vec![],
+        };
+        // Start an empty node store
+        let mut node_store =
+            SequecerBlockStore::open_db_with_genesis(path, Some(genesis_block)).unwrap();
+        let (block, tx) = create_dummy_block_with_transaction(1);
+        // Try retrieve a tx that's not in the chain yet.
+        let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
+        assert_eq!(None, retrieved_tx);
+        // Add the block with the transaction
+        node_store.put_block_at_id(block).unwrap();
+        // Try again
         let retrieved_tx = node_store.get_transaction_by_hash(tx.hash());
         assert_eq!(Some(tx), retrieved_tx);
-    }
-
-    #[test]
-    fn test_get_transaction_by_hash_for_non_existent_transaction() {
-        let temp_dir = tempdir().unwrap();
-        let path = temp_dir.path();
-
-        let (block, _) = create_genesis_block_with_transaction();
-        let node_store = SequecerBlockStore::open_db_with_genesis(path, Some(block)).unwrap();
-        let retrieved_tx = node_store.get_transaction_by_hash([0; 32]);
-        assert_eq!(None, retrieved_tx);
     }
 }
