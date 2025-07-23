@@ -92,6 +92,12 @@ impl SequencerCore {
 
         let tx_hash = *tx.hash();
 
+        let mempool_size = self.mempool.len();
+
+        if mempool_size >= self.sequencer_config.max_num_tx_in_block {
+            return Err(TransactionMalformationErrorKind::MempoolFullForRound { tx: tx_hash });
+        }
+
         let curr_sequencer_roots = self.get_tree_roots();
 
         if tx_roots != curr_sequencer_roots {
@@ -133,23 +139,20 @@ impl SequencerCore {
 
         //Tree checks
         let tx_tree_check = self.store.pub_tx_store.get_tx(tx_hash).is_some();
-        let nullifier_tree_check = nullifier_created_hashes
-            .iter()
-            .map(|nullifier_hash| {
-                self.store.nullifier_store.contains(&UTXONullifier {
-                    utxo_hash: *nullifier_hash,
-                })
+        let nullifier_tree_check = nullifier_created_hashes.iter().any(|nullifier_hash| {
+            self.store.nullifier_store.contains(&UTXONullifier {
+                utxo_hash: *nullifier_hash,
             })
-            .any(|check| check);
-        let utxo_commitments_check = utxo_commitments_created_hashes
-            .iter()
-            .map(|utxo_commitment_hash| {
-                self.store
-                    .utxo_commitments_store
-                    .get_tx(*utxo_commitment_hash)
-                    .is_some()
-            })
-            .any(|check| check);
+        });
+        let utxo_commitments_check =
+            utxo_commitments_created_hashes
+                .iter()
+                .any(|utxo_commitment_hash| {
+                    self.store
+                        .utxo_commitments_store
+                        .get_tx(*utxo_commitment_hash)
+                        .is_some()
+                });
 
         if tx_tree_check {
             return Err(
@@ -235,7 +238,7 @@ impl SequencerCore {
             .pop_size(self.sequencer_config.max_num_tx_in_block);
 
         for tx in &transactions {
-            self.execute_check_transaction_on_state(&tx)?;
+            self.execute_check_transaction_on_state(tx)?;
         }
 
         let prev_block_hash = self
@@ -283,7 +286,7 @@ mod tests {
         let mut rng = rand::thread_rng();
         let random_u8: u8 = rng.gen();
 
-        let path_str = format!("/tmp/sequencer_{:?}", random_u8);
+        let path_str = format!("/tmp/sequencer_{random_u8:?}");
 
         SequencerConfig {
             home: PathBuf::from(path_str),
@@ -361,18 +364,16 @@ mod tests {
         assert_eq!(sequencer.sequencer_config.max_num_tx_in_block, 10);
         assert_eq!(sequencer.sequencer_config.port, 8080);
 
-        let acc1_addr: [u8; 32] = hex::decode(
-            "bfd91e6703273a115ad7f099ef32f621243be69369d00ddef5d3a25117d09a8c".to_string(),
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
-        let acc2_addr: [u8; 32] = hex::decode(
-            "20573479053979b98d2ad09ef31a0750f22c77709bed51c4e64946bd1e376f31".to_string(),
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
+        let acc1_addr: [u8; 32] =
+            hex::decode("bfd91e6703273a115ad7f099ef32f621243be69369d00ddef5d3a25117d09a8c")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let acc2_addr: [u8; 32] =
+            hex::decode("20573479053979b98d2ad09ef31a0750f22c77709bed51c4e64946bd1e376f31")
+                .unwrap()
+                .try_into()
+                .unwrap();
 
         assert!(sequencer.store.acc_store.contains_account(&acc1_addr));
         assert!(sequencer.store.acc_store.contains_account(&acc2_addr));
@@ -415,18 +416,16 @@ mod tests {
         let config = setup_sequencer_config_variable_initial_accounts(initial_accounts);
         let sequencer = SequencerCore::start_from_config(config.clone());
 
-        let acc1_addr: [u8; 32] = hex::decode(
-            "bfd91e6703273a115ad7f099ef32f621243be69369d00ddef5d3a25117ffffff".to_string(),
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
-        let acc2_addr: [u8; 32] = hex::decode(
-            "20573479053979b98d2ad09ef31a0750f22c77709bed51c4e64946bd1effffff".to_string(),
-        )
-        .unwrap()
-        .try_into()
-        .unwrap();
+        let acc1_addr: [u8; 32] =
+            hex::decode("bfd91e6703273a115ad7f099ef32f621243be69369d00ddef5d3a25117ffffff")
+                .unwrap()
+                .try_into()
+                .unwrap();
+        let acc2_addr: [u8; 32] =
+            hex::decode("20573479053979b98d2ad09ef31a0750f22c77709bed51c4e64946bd1effffff")
+                .unwrap()
+                .try_into()
+                .unwrap();
 
         assert!(sequencer.store.acc_store.contains_account(&acc1_addr));
         assert!(sequencer.store.acc_store.contains_account(&acc2_addr));
