@@ -271,8 +271,7 @@ impl NodeCore {
                 secret_r,
                 sc_addr,
                 state_changes,
-            }
-            .into(),
+            },
             result_hash,
         ))
     }
@@ -367,8 +366,7 @@ impl NodeCore {
                 secret_r,
                 sc_addr,
                 state_changes,
-            }
-            .into(),
+            },
             result_hashes,
         ))
     }
@@ -481,8 +479,7 @@ impl NodeCore {
                 secret_r,
                 sc_addr,
                 state_changes,
-            }
-            .into(),
+            },
             utxo_hashes,
         ))
     }
@@ -625,8 +622,7 @@ impl NodeCore {
                 secret_r,
                 sc_addr,
                 state_changes,
-            }
-            .into(),
+            },
             utxo_hashes_receiver,
             utxo_hashes_not_spent,
         ))
@@ -752,8 +748,7 @@ impl NodeCore {
                 secret_r,
                 sc_addr,
                 state_changes,
-            }
-            .into(),
+            },
             utxo_hashes,
         ))
     }
@@ -837,8 +832,7 @@ impl NodeCore {
             secret_r,
             sc_addr,
             state_changes,
-        }
-        .into())
+        })
     }
 
     pub async fn send_private_mint_tx(
@@ -932,8 +926,7 @@ impl NodeCore {
                 secret_r,
                 sc_addr,
                 state_changes,
-            )
-            .into();
+            );
         tx.log();
 
         Ok(self.sequencer_client.send_tx(tx, tx_roots).await?)
@@ -1475,8 +1468,7 @@ impl NodeCore {
                 secret_r,
                 sc_addr,
                 state_changes,
-            }
-            .into(),
+            },
             utxo_hashes,
         ))
     }
