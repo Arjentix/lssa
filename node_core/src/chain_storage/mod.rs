@@ -5,9 +5,9 @@ use anyhow::Result;
 use block_store::NodeBlockStore;
 use common::{
     block::Block,
+    execution_input::PublicNativeTokenSend,
     merkle_tree_public::merkle_tree::{PublicTransactionMerkleTree, UTXOCommitmentsMerkleTree},
     nullifier::UTXONullifier,
-    public_transfer_receipts::PublicNativeTokenSend,
     utxo_commitment::UTXOCommitment,
 };
 use k256::AffinePoint;
@@ -166,10 +166,10 @@ impl NodeChainStore {
                     if let Ok(transfer) = native_transfer {
                         if let Some(acc_sender) = self.acc_map.get_mut(&transfer.from) {
                             //Can panic, we depend on sequencer maintaining chain consistency here
-                            acc_sender.balance -= transfer.moved_balance;
+                            acc_sender.balance -= transfer.balance_to_move;
 
                             if let Some(acc_rec) = self.acc_map.get_mut(&transfer.to) {
-                                acc_rec.balance += transfer.moved_balance;
+                                acc_rec.balance += transfer.balance_to_move;
                             }
                         }
                     }

@@ -6,5 +6,5 @@ use crate::merkle_tree_public::TreeHashType;
 pub struct PublicNativeTokenSend {
     pub from: TreeHashType,
     pub to: TreeHashType,
-    pub moved_balance: u64,
+    pub balance_to_move: u64,
 }

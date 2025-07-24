@@ -3,9 +3,9 @@ use serde::Deserialize;
 
 pub mod block;
 pub mod commitment;
+pub mod execution_input;
 pub mod merkle_tree_public;
 pub mod nullifier;
-pub mod public_transfer_receipts;
 pub mod rpc_primitives;
 pub mod transaction;
 pub mod utxo_commitment;

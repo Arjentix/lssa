@@ -4,9 +4,9 @@ use accounts::account_core::AccountAddress;
 use anyhow::Result;
 use common::{
     block::{Block, HashableBlockData},
+    execution_input::PublicNativeTokenSend,
     merkle_tree_public::TreeHashType,
     nullifier::UTXONullifier,
-    public_transfer_receipts::PublicNativeTokenSend,
     transaction::{AuthenticatedTransaction, Transaction, TransactionBody, TxKind},
     utxo_commitment::UTXOCommitment,
 };
@@ -177,33 +177,6 @@ impl SequencerCore {
             );
         }
 
-        //Balance check
-        if let Ok(native_transfer_action) =
-            serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
-        {
-            let from_balance = self
-                .store
-                .acc_store
-                .get_account_balance(&native_transfer_action.from);
-            let to_balance = self
-                .store
-                .acc_store
-                .get_account_balance(&native_transfer_action.to);
-
-            if from_balance >= native_transfer_action.moved_balance {
-                self.store.acc_store.set_account_balance(
-                    &native_transfer_action.from,
-                    from_balance - native_transfer_action.moved_balance,
-                );
-                self.store.acc_store.set_account_balance(
-                    &native_transfer_action.to,
-                    to_balance + native_transfer_action.moved_balance,
-                );
-            } else {
-                return Err(TransactionMalformationErrorKind::BalanceMismatch { tx: tx_hash });
-            }
-        }
-
         Ok(tx)
     }
 
@@ -233,8 +206,11 @@ impl SequencerCore {
         let TransactionBody {
             ref utxo_commitments_created_hashes,
             ref nullifier_created_hashes,
+            execution_input,
             ..
         } = mempool_tx.auth_tx.transaction().body();
+
+        let tx_hash = *mempool_tx.auth_tx.hash();
 
         for utxo_comm in utxo_commitments_created_hashes {
             self.store
@@ -251,6 +227,33 @@ impl SequencerCore {
         self.store
             .pub_tx_store
             .add_tx(mempool_tx.auth_tx.transaction());
+
+        //Balance check
+        if let Ok(native_transfer_action) =
+            serde_json::from_slice::<PublicNativeTokenSend>(execution_input)
+        {
+            let from_balance = self
+                .store
+                .acc_store
+                .get_account_balance(&native_transfer_action.from);
+            let to_balance = self
+                .store
+                .acc_store
+                .get_account_balance(&native_transfer_action.to);
+
+            if from_balance >= native_transfer_action.balance_to_move {
+                self.store.acc_store.set_account_balance(
+                    &native_transfer_action.from,
+                    from_balance - native_transfer_action.balance_to_move,
+                );
+                self.store.acc_store.set_account_balance(
+                    &native_transfer_action.to,
+                    to_balance + native_transfer_action.balance_to_move,
+                );
+            } else {
+                return Err(TransactionMalformationErrorKind::BalanceMismatch { tx: tx_hash });
+            }
+        }
 
         Ok(())
     }

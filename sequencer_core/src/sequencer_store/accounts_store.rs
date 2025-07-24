@@ -66,17 +66,17 @@ impl SequencerAccountsStore {
 
     ///Update `account_addr` balance,
     ///
-    /// returns 0, if account address not found, othervise returns previous balance
+    /// returns 0, if account address not found, otherwise returns previous balance
     pub fn set_account_balance(&mut self, account_addr: &AccountAddress, new_balance: u64) -> u64 {
         let acc_data = self.accounts.get_mut(account_addr);
 
         acc_data
             .map(|data| {
-                let old_bal = data.balance;
+                let old_balance = data.balance;
 
                 data.balance = new_balance;
 
-                old_bal
+                old_balance
             })
             .unwrap_or(0)
     }

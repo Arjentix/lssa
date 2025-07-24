@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use common::{
-    public_transfer_receipts::PublicNativeTokenSend, transaction::Transaction, ExecutionFailureKind,
+    execution_input::PublicNativeTokenSend, transaction::Transaction, ExecutionFailureKind,
 };
 
 use accounts::{
@@ -955,7 +955,7 @@ impl NodeCore {
         &self,
         from: AccountAddress,
         to: AccountAddress,
-        moved_balance: u64,
+        balance_to_move: u64,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let tx_roots = self.get_roots().await;
 
@@ -982,7 +982,7 @@ impl NodeCore {
                 serde_json::to_vec(&PublicNativeTokenSend {
                     from,
                     to,
-                    moved_balance,
+                    balance_to_move,
                 })
                 .unwrap(),
                 commitment,
