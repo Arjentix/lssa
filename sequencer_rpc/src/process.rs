@@ -1,11 +1,17 @@
 use actix_web::Error as HttpError;
 use serde_json::Value;
 
-use common::rpc_primitives::{
-    errors::RpcError,
-    message::{Message, Request},
-    parser::RpcRequest,
-    requests::{GetAccountBalanceRequest, GetAccountBalanceResponse},
+use common::{
+    merkle_tree_public::TreeHashType,
+    rpc_primitives::{
+        errors::RpcError,
+        message::{Message, Request},
+        parser::RpcRequest,
+        requests::{
+            GetAccountBalanceRequest, GetAccountBalanceResponse, GetTransactionByHashRequest,
+            GetTransactionByHashResponse,
+        },
+    },
 };
 
 use common::rpc_primitives::requests::{
@@ -23,6 +29,7 @@ pub const GET_BLOCK: &str = "get_block";
 pub const GET_GENESIS: &str = "get_genesis";
 pub const GET_LAST_BLOCK: &str = "get_last_block";
 pub const GET_ACCOUNT_BALANCE: &str = "get_account_balance";
+pub const GET_TRANSACTION_BY_HASH: &str = "get_transaction_by_hash";
 
 pub const HELLO_FROM_SEQUENCER: &str = "HELLO_FROM_SEQUENCER";
 
@@ -142,6 +149,7 @@ impl JsonHandler {
         let address = address_bytes
             .try_into()
             .map_err(|_| RpcError::invalid_params("invalid length".to_string()))?;
+
         let balance = {
             let state = self.sequencer_state.lock().await;
             state.store.acc_store.get_account_balance(&address)
@@ -150,6 +158,24 @@ impl JsonHandler {
 
         let helperstruct = GetAccountBalanceResponse { balance };
 
+        respond(helperstruct)
+    }
+
+    /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
+    /// The hash must be a valid hex string of the correct length.
+    async fn process_get_transaction_by_hash(&self, request: Request) -> Result<Value, RpcErr> {
+        let get_transaction_req = GetTransactionByHashRequest::parse(Some(request.params))?;
+        let bytes: Vec<u8> = hex::decode(get_transaction_req.hash)
+            .map_err(|_| RpcError::invalid_params("invalid hex".to_string()))?;
+        let hash: TreeHashType = bytes
+            .try_into()
+            .map_err(|_| RpcError::invalid_params("invalid length".to_string()))?;
+
+        let transaction = {
+            let state = self.sequencer_state.lock().await;
+            state.store.block_store.get_transaction_by_hash(hash)
+        };
+        let helperstruct = GetTransactionByHashResponse { transaction };
         respond(helperstruct)
     }
 
@@ -162,6 +188,7 @@ impl JsonHandler {
             GET_GENESIS => self.process_get_genesis(request).await,
             GET_LAST_BLOCK => self.process_get_last_block(request).await,
             GET_ACCOUNT_BALANCE => self.process_get_account_balance(request).await,
+            GET_TRANSACTION_BY_HASH => self.process_get_transaction_by_hash(request).await,
             _ => Err(RpcErr(RpcError::method_not_found(request.method))),
         }
     }
@@ -172,7 +199,10 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{rpc_handler, JsonHandler};
-    use common::rpc_primitives::RpcPollingConfig;
+    use common::{
+        rpc_primitives::RpcPollingConfig,
+        transaction::{SignaturePrivateKey, Transaction, TransactionBody},
+    };
     use sequencer_core::{
         config::{AccountInitialData, SequencerConfig},
         SequencerCore,
@@ -209,11 +239,35 @@ mod tests {
 
     fn json_handler_for_tests() -> JsonHandler {
         let config = sequencer_config_for_tests();
-        let sequencer_core = Arc::new(Mutex::new(SequencerCore::start_from_config(config)));
+        let mut sequencer_core = SequencerCore::start_from_config(config);
+        let tx_body = TransactionBody {
+            tx_kind: common::transaction::TxKind::Public,
+            execution_input: Default::default(),
+            execution_output: Default::default(),
+            utxo_commitments_spent_hashes: Default::default(),
+            utxo_commitments_created_hashes: Default::default(),
+            nullifier_created_hashes: Default::default(),
+            execution_proof_private: Default::default(),
+            encoded_data: Default::default(),
+            ephemeral_pub_key: Default::default(),
+            commitment: Default::default(),
+            tweak: Default::default(),
+            secret_r: Default::default(),
+            sc_addr: Default::default(),
+            state_changes: Default::default(),
+        };
+        let tx = Transaction::new(tx_body, SignaturePrivateKey::from_slice(&[1; 32]).unwrap());
+
+        sequencer_core
+            .push_tx_into_mempool_pre_check(tx, [[0; 32]; 2])
+            .unwrap();
+        sequencer_core
+            .produce_new_block_with_mempool_transactions()
+            .unwrap();
 
         JsonHandler {
             polling_config: RpcPollingConfig::default(),
-            sequencer_state: sequencer_core,
+            sequencer_state: Arc::new(Mutex::new(sequencer_core)),
         }
     }
 
@@ -320,6 +374,117 @@ mod tests {
             "jsonrpc": "2.0",
             "result": {
                 "balance": 100
+            }
+        });
+
+        let response = call_rpc_handler_with_json(json_handler, request).await;
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[actix_web::test]
+    async fn test_get_transaction_by_hash_for_non_existent_hash() {
+        let json_handler = json_handler_for_tests();
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "get_transaction_by_hash",
+            "params": { "hash": "cafe".repeat(16) },
+            "id": 1
+        });
+        let expected_response = serde_json::json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "result": {
+                "transaction": null
+            }
+        });
+
+        let response = call_rpc_handler_with_json(json_handler, request).await;
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[actix_web::test]
+    async fn test_get_transaction_by_hash_for_invalid_hex() {
+        let json_handler = json_handler_for_tests();
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "get_transaction_by_hash",
+            "params": { "hash": "not_a_valid_hex" },
+            "id": 1
+        });
+        let expected_response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+                "code": -32602,
+                "message": "Invalid params",
+                "data": "invalid hex"
+            }
+        });
+
+        let response = call_rpc_handler_with_json(json_handler, request).await;
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[actix_web::test]
+    async fn test_get_transaction_by_hash_for_invalid_length() {
+        let json_handler = json_handler_for_tests();
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "get_transaction_by_hash",
+            "params": { "hash": "cafecafe" },
+            "id": 1
+        });
+        let expected_response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "error": {
+                "code": -32602,
+                "message": "Invalid params",
+                "data": "invalid length"
+            }
+        });
+
+        let response = call_rpc_handler_with_json(json_handler, request).await;
+
+        assert_eq!(response, expected_response);
+    }
+
+    #[actix_web::test]
+    async fn test_get_transaction_by_hash_for_existing_transaction() {
+        let json_handler = json_handler_for_tests();
+        let request = serde_json::json!({
+            "jsonrpc": "2.0",
+            "method": "get_transaction_by_hash",
+            "params": { "hash": "ca8e38269c0137d27cbe7c55d240a834b46e86e236578b9a1a3a25b3dabc5709" },
+            "id": 1
+        });
+        let expected_response = serde_json::json!({
+            "id": 1,
+            "jsonrpc": "2.0",
+            "result": {
+                "transaction": {
+                    "body": {
+                        "commitment": [],
+                        "encoded_data": [],
+                        "ephemeral_pub_key": [],
+                        "execution_input": [],
+                        "execution_output": [],
+                        "execution_proof_private": "",
+                        "nullifier_created_hashes": [],
+                        "sc_addr": "",
+                        "secret_r": vec![0; 32],
+                        "state_changes": [null, 0],
+                        "tweak": "0".repeat(64),
+                        "tx_kind": "Public",
+                        "utxo_commitments_created_hashes": [],
+                        "utxo_commitments_spent_hashes": []
+                    },
+                    "public_key": "3056301006072A8648CE3D020106052B8104000A034200041B84C5567B126440995D3ED5AABA0565D71E1834604819FF9C17F5E9D5DD078F70BEAF8F588B541507FED6A642C5AB42DFDF8120A7F639DE5122D47A69A8E8D1",
+                    "signature": "28CB6CA744864340A3441CB48D5700690F90130DE0760EE5C640F85F4285C5FD2BD7D0E270EC2AC82E4124999E63659AA9C33CF378F959EDF4E50F2626EA3B99"
+                }
             }
         });
 
