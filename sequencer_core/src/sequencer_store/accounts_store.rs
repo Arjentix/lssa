@@ -170,7 +170,7 @@ mod tests {
         let acc1 = Account::new_with_balance(12);
         let acc2 = Account::new_with_balance(100);
 
-        let acc1_addr = acc1.address.clone();
+        let acc1_addr = acc1.address;
 
         let mut seq_acc_store = SequencerAccountsStore::new(&[acc1, acc2]);
 
@@ -197,8 +197,8 @@ mod tests {
         let acc1 = Account::new_with_balance(12);
         let acc2 = Account::new_with_balance(100);
 
-        let acc1_addr = acc1.address.clone();
-        let acc2_addr = acc2.address.clone();
+        let acc1_addr = acc1.address;
+        let acc2_addr = acc2.address;
 
         let seq_acc_store = SequencerAccountsStore::new(&[acc1, acc2]);
 
@@ -220,9 +220,9 @@ mod tests {
         let acc2 = Account::new_with_balance(15);
         let acc3 = Account::new_with_balance(10);
 
-        let acc1_addr = acc1.address.clone();
-        let acc2_addr = acc2.address.clone();
-        let acc3_addr = acc3.address.clone();
+        let acc1_addr = acc1.address;
+        let acc2_addr = acc2.address;
+        let acc3_addr = acc3.address;
 
         let seq_acc_store = SequencerAccountsStore::new(&[acc1, acc2, acc3]);
 
@@ -230,15 +230,15 @@ mod tests {
         assert!(seq_acc_store.contains_account(&acc2_addr));
         assert!(seq_acc_store.contains_account(&acc3_addr));
 
-        let acc_balance = seq_acc_store.get_account_balance(&[6; 32]);
+        let acc_balance = seq_acc_store.get_account_balance(&acc1_addr);
 
         assert_eq!(acc_balance, 120);
 
-        let acc_balance = seq_acc_store.get_account_balance(&[7; 32]);
+        let acc_balance = seq_acc_store.get_account_balance(&acc2_addr);
 
         assert_eq!(acc_balance, 15);
 
-        let acc_balance = seq_acc_store.get_account_balance(&[8; 32]);
+        let acc_balance = seq_acc_store.get_account_balance(&acc3_addr);
 
         assert_eq!(acc_balance, 10);
     }

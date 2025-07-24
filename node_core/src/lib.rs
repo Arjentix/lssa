@@ -972,7 +972,7 @@ impl NodeCore {
 
         let sc_addr = hex::encode([0; 32]);
 
-        //Native  does not change its state
+        //Native contract does not change its state
         let state_changes: Vec<DataBlobChangeVariant> = vec![];
         let new_len = 0;
         let state_changes = (serde_json::to_value(state_changes).unwrap(), new_len);
@@ -990,8 +990,7 @@ impl NodeCore {
                 secret_r,
                 sc_addr,
                 state_changes,
-            )
-            .into();
+            );
         tx.log();
 
         {

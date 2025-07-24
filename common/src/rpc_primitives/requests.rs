@@ -36,6 +36,8 @@ pub struct GetLastBlockRequest {}
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct GetInitialTestnetAccountsRequest {}
+
+#[derive(Serialize, Deserialize, Debug)]
 pub struct GetAccountBalanceRequest {
     pub address: String,
 }
