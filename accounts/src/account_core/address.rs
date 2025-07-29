@@ -4,6 +4,8 @@ use tiny_keccak::{Hasher, Keccak};
 // TODO: Consider wrapping `AccountAddress` in a struct.
 
 pub type AccountAddress = [u8; 32];
+
+/// Returns the address associated with a public key
 pub fn from_public_key(public_key: &SignaturePublicKey) -> AccountAddress {
     let mut address = [0; 32];
     let mut keccak_hasher = Keccak::v256();

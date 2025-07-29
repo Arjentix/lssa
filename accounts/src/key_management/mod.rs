@@ -17,8 +17,6 @@ pub mod secret_holders;
 #[derive(Serialize, Deserialize, Clone, Debug)]
 ///Entrypoint to key management
 pub struct AddressKeyHolder {
-    //Will be useful in future
-    #[allow(dead_code)]
     top_secret_key_holder: TopSecretKeyHolder,
     pub utxo_secret_key_holder: UTXOSecretKeyHolder,
     pub_account_signing_key: PublicAccountSigningKey,
