@@ -1,7 +1,9 @@
 use accounts::account_core::Account;
 use anyhow::Result;
 use common::rpc_primitives::requests::{
-    GetAccountBalanceRequest, GetAccountBalanceResponse, GetBlockDataRequest, GetBlockDataResponse, GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest, RegisterAccountRequest, RegisterAccountResponse
+    GetAccountBalanceRequest, GetAccountBalanceResponse, GetBlockDataRequest, GetBlockDataResponse,
+    GetGenesisIdRequest, GetGenesisIdResponse, GetInitialTestnetAccountsRequest,
+    RegisterAccountRequest, RegisterAccountResponse,
 };
 use common::transaction::Transaction;
 use common::{SequencerClientError, SequencerRpcError};
@@ -77,7 +79,9 @@ impl SequencerClient {
 
         let req = serde_json::to_value(block_req)?;
 
-        let resp = self.call_method_with_payload("get_account_balance", req).await?;
+        let resp = self
+            .call_method_with_payload("get_account_balance", req)
+            .await?;
 
         let resp_deser = serde_json::from_value(resp)?;
 
