@@ -253,6 +253,21 @@ pub async fn test_failure(wrapped_node_core: Arc<Mutex<NodeCore>>) {
     info!("Success!");
 }
 
+macro_rules! test_cleanup_wrap {
+    ($home_dir:ident, $test_func:ident) => {{
+        let res = pre_test($home_dir.clone()).await.unwrap();
+
+        let wrapped_node_core = res.5.clone();
+
+        info!("Waiting for first block creation");
+        tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
+
+        $test_func(wrapped_node_core.clone()).await;
+
+        post_test(res).await;
+    }};
+}
+
 pub async fn main_tests_runner() -> Result<()> {
     env_logger::init();
 
@@ -264,78 +279,18 @@ pub async fn main_tests_runner() -> Result<()> {
 
     match test_name.as_str() {
         "test_success_move_to_another_account" => {
-            let res = pre_test(home_dir).await.unwrap();
-
-            let wrapped_node_core = res.5.clone();
-
-            info!("Waiting for first block creation");
-            tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-            test_success_move_to_another_account(wrapped_node_core.clone()).await;
-
-            post_test(res).await;
+            test_cleanup_wrap!(home_dir, test_success_move_to_another_account);
         }
         "test_success" => {
-            let res = pre_test(home_dir).await.unwrap();
-
-            let wrapped_node_core = res.5.clone();
-
-            info!("Waiting for first block creation");
-            tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-            test_success(wrapped_node_core.clone()).await;
-
-            post_test(res).await;
+            test_cleanup_wrap!(home_dir, test_success);
         }
         "test_failure" => {
-            let res = pre_test(home_dir).await.unwrap();
-
-            let wrapped_node_core = res.5.clone();
-
-            info!("Waiting for first block creation");
-            tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-            test_failure(wrapped_node_core.clone()).await;
-
-            post_test(res).await;
+            test_cleanup_wrap!(home_dir, test_failure);
         }
         "all" => {
-            {
-                let res = pre_test(home_dir.clone()).await.unwrap();
-
-                let wrapped_node_core = res.5.clone();
-
-                info!("Waiting for first block creation");
-                tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-                test_success_move_to_another_account(wrapped_node_core.clone()).await;
-
-                post_test(res).await;
-            }
-            {
-                let res = pre_test(home_dir.clone()).await.unwrap();
-
-                let wrapped_node_core = res.5.clone();
-
-                info!("Waiting for first block creation");
-                tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-                test_success(wrapped_node_core.clone()).await;
-
-                post_test(res).await;
-            }
-            {
-                let res = pre_test(home_dir.clone()).await.unwrap();
-
-                let wrapped_node_core = res.5.clone();
-
-                info!("Waiting for first block creation");
-                tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
-
-                test_failure(wrapped_node_core.clone()).await;
-
-                post_test(res).await;
-            }
+            test_cleanup_wrap!(home_dir, test_success_move_to_another_account);
+            test_cleanup_wrap!(home_dir, test_success);
+            test_cleanup_wrap!(home_dir, test_failure);
         }
         _ => {
             anyhow::bail!("Unknown test name");
