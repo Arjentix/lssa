@@ -2,7 +2,9 @@ use k256::ecdsa::SigningKey;
 use secp256k1_zkp::Tweak;
 
 use crate::{
-    block::{Block, HashableBlockData}, execution_input::PublicNativeTokenSend, transaction::{SignaturePrivateKey, Transaction, TransactionBody, TxKind}
+    block::{Block, HashableBlockData},
+    execution_input::PublicNativeTokenSend,
+    transaction::{SignaturePrivateKey, Transaction, TransactionBody, TxKind},
 };
 
 //Dummy producers
@@ -55,62 +57,62 @@ pub fn produce_dummy_empty_transaction() -> Transaction {
 }
 
 pub fn create_dummy_private_transaction_random_signer(
-        nullifier_created_hashes: Vec<[u8; 32]>,
-        utxo_commitments_spent_hashes: Vec<[u8; 32]>,
-        utxo_commitments_created_hashes: Vec<[u8; 32]>,
-    ) -> Transaction {
-        let mut rng = rand::thread_rng();
+    nullifier_created_hashes: Vec<[u8; 32]>,
+    utxo_commitments_spent_hashes: Vec<[u8; 32]>,
+    utxo_commitments_created_hashes: Vec<[u8; 32]>,
+) -> Transaction {
+    let mut rng = rand::thread_rng();
 
-        let body = TransactionBody {
-            tx_kind: TxKind::Private,
-            execution_input: vec![],
-            execution_output: vec![],
-            utxo_commitments_spent_hashes,
-            utxo_commitments_created_hashes,
-            nullifier_created_hashes,
-            execution_proof_private: "dummy_proof".to_string(),
-            encoded_data: vec![],
-            ephemeral_pub_key: vec![10, 11, 12],
-            commitment: vec![],
-            tweak: Tweak::new(&mut rng),
-            secret_r: [0; 32],
-            sc_addr: "sc_addr".to_string(),
-            state_changes: (serde_json::Value::Null, 0),
-        };
-        Transaction::new(body, SignaturePrivateKey::random(&mut rng))
-    }
+    let body = TransactionBody {
+        tx_kind: TxKind::Private,
+        execution_input: vec![],
+        execution_output: vec![],
+        utxo_commitments_spent_hashes,
+        utxo_commitments_created_hashes,
+        nullifier_created_hashes,
+        execution_proof_private: "dummy_proof".to_string(),
+        encoded_data: vec![],
+        ephemeral_pub_key: vec![10, 11, 12],
+        commitment: vec![],
+        tweak: Tweak::new(&mut rng),
+        secret_r: [0; 32],
+        sc_addr: "sc_addr".to_string(),
+        state_changes: (serde_json::Value::Null, 0),
+    };
+    Transaction::new(body, SignaturePrivateKey::random(&mut rng))
+}
 
 pub fn create_dummy_transaction_native_token_transfer(
-        from: [u8; 32],
-        nonce: u64,
-        to: [u8; 32],
-        balance_to_move: u64,
-        signing_key: SigningKey,
-    ) -> Transaction {
-        let mut rng = rand::thread_rng();
+    from: [u8; 32],
+    nonce: u64,
+    to: [u8; 32],
+    balance_to_move: u64,
+    signing_key: SigningKey,
+) -> Transaction {
+    let mut rng = rand::thread_rng();
 
-        let native_token_transfer = PublicNativeTokenSend {
-            from,
-            nonce,
-            to,
-            balance_to_move,
-        };
+    let native_token_transfer = PublicNativeTokenSend {
+        from,
+        nonce,
+        to,
+        balance_to_move,
+    };
 
-        let body = TransactionBody {
-            tx_kind: TxKind::Public,
-            execution_input: serde_json::to_vec(&native_token_transfer).unwrap(),
-            execution_output: vec![],
-            utxo_commitments_spent_hashes: vec![],
-            utxo_commitments_created_hashes: vec![],
-            nullifier_created_hashes: vec![],
-            execution_proof_private: "".to_string(),
-            encoded_data: vec![],
-            ephemeral_pub_key: vec![10, 11, 12],
-            commitment: vec![],
-            tweak: Tweak::new(&mut rng),
-            secret_r: [0; 32],
-            sc_addr: "sc_addr".to_string(),
-            state_changes: (serde_json::Value::Null, 0),
-        };
-        Transaction::new(body, signing_key)
-    }
+    let body = TransactionBody {
+        tx_kind: TxKind::Public,
+        execution_input: serde_json::to_vec(&native_token_transfer).unwrap(),
+        execution_output: vec![],
+        utxo_commitments_spent_hashes: vec![],
+        utxo_commitments_created_hashes: vec![],
+        nullifier_created_hashes: vec![],
+        execution_proof_private: "".to_string(),
+        encoded_data: vec![],
+        ephemeral_pub_key: vec![10, 11, 12],
+        commitment: vec![],
+        tweak: Tweak::new(&mut rng),
+        secret_r: [0; 32],
+        sc_addr: "sc_addr".to_string(),
+        state_changes: (serde_json::Value::Null, 0),
+    };
+    Transaction::new(body, signing_key)
+}

@@ -54,15 +54,13 @@ impl NodeChainStore {
         let utxo_commitments_store = UTXOCommitmentsMerkleTree::new(vec![]);
         let pub_tx_store = PublicTransactionMerkleTree::new(vec![]);
 
-        Ok(
-            Self {
-                acc_map,
-                nullifier_store,
-                utxo_commitments_store,
-                pub_tx_store,
-                node_config: config,
-            }
-        )
+        Ok(Self {
+            acc_map,
+            nullifier_store,
+            utxo_commitments_store,
+            pub_tx_store,
+            node_config: config,
+        })
     }
 
     pub fn produce_context(&self, caller: AccountAddress) -> PublicSCContext {
