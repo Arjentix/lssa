@@ -121,49 +121,85 @@ impl V01State {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        public_transaction::{self, WitnessSet},
-        signature::PrivateKey,
-    };
+    use crate::{public_transaction, signature::PrivateKey};
 
-    fn genesis_state_for_tests() -> (V01State, Address) {
-        let account_1 = {
-            let mut this = Account::default();
-            this.program_owner = AuthenticatedTransferProgram::PROGRAM_ID;
-            this.balance = 100;
-            this
-        };
-        let address_1 = Address::new([1; 32]);
-        let public_state = [(address_1.clone(), account_1)].into_iter().collect();
-        (V01State { public_state }, address_1)
+    fn genesis_state_for_tests(balances: &[u128], addresses: &[Address]) -> V01State {
+        assert_eq!(balances.len(), addresses.len());
+        let accounts: Vec<Account> = balances
+            .iter()
+            .map(|balance| {
+                let mut account = Account::default();
+                account.balance = *balance;
+                account.program_owner = AuthenticatedTransferProgram::PROGRAM_ID;
+                account
+            })
+            .collect();
+
+        let public_state = addresses
+            .to_owned()
+            .into_iter()
+            .zip(accounts.into_iter())
+            .collect();
+        V01State { public_state }
     }
 
     fn transfer_transaction_for_tests(
         from: Address,
         from_key: PrivateKey,
+        nonce: u128,
         to: Address,
         balance: u128,
     ) -> PublicTransaction {
         let addresses = vec![from, to];
-        let nonces = vec![0];
+        let nonces = vec![nonce];
         let program_id = AuthenticatedTransferProgram::PROGRAM_ID;
         let message = public_transaction::Message::new(program_id, addresses, nonces, balance);
-        let witness_set = WitnessSet::for_message(&message, &[from_key]);
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[from_key]);
         PublicTransaction::new(message, witness_set)
     }
 
     #[test]
     fn test_1() {
-        let (mut genesis_state, address) = genesis_state_for_tests();
-        let from = address;
+        let addresses = [Address::new([1; 32])];
+        let balances = [100];
+        let mut genesis_state = genesis_state_for_tests(&balances, &addresses);
+        let from = addresses[0].clone();
         let from_key = PrivateKey(1);
         let to = Address::new([2; 32]);
         let balance_to_move = 5;
-        let tx = transfer_transaction_for_tests(from, from_key, to.clone(), 5);
+        let tx =
+            transfer_transaction_for_tests(from.clone(), from_key, 0, to.clone(), balance_to_move);
         let _ = genesis_state.transition_from_public_transaction(tx);
         assert_eq!(
             genesis_state.get_account_by_address(&to).balance,
             balance_to_move
         );
+        assert_eq!(
+            genesis_state.get_account_by_address(&from).balance,
+            balances[0] - balance_to_move
+        );
+        assert_eq!(genesis_state.get_account_by_address(&from).nonce, 1);
+        assert_eq!(genesis_state.get_account_by_address(&to).nonce, 0);
+    }
+
+    #[test]
+    fn test_2() {
+        let addresses = [Address::new([1; 32]), Address::new([99; 32])];
+        let balances = [100, 200];
+        let mut genesis_state = genesis_state_for_tests(&balances, &addresses);
+        let from = addresses[1].clone();
+        let from_key = PrivateKey(99);
+        let to = addresses[0].clone();
+        let balance_to_move = 8;
+        let to_previous_balance = genesis_state.get_account_by_address(&to).balance;
+        let tx = transfer_transaction_for_tests(from.clone(), from_key, 0, to.clone(), balance_to_move);
+        let _ = genesis_state.transition_from_public_transaction(tx);
+        assert_eq!(genesis_state.get_account_by_address(&to).balance, 108);
+        assert_eq!(
+            genesis_state.get_account_by_address(&from).balance,
+            balances[1] - balance_to_move
+        );
+        assert_eq!(genesis_state.get_account_by_address(&from).nonce, 1);
+        assert_eq!(genesis_state.get_account_by_address(&to).nonce, 0);
     }
 }
