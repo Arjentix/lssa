@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
-use node_core::{execute_subcommand, Args};
 use tokio::runtime::Builder;
+use wallet::{execute_subcommand, Args};
 
 pub const NUM_THREADS: usize = 2;
 
@@ -13,6 +13,8 @@ fn main() -> Result<()> {
         .unwrap();
 
     let args = Args::parse();
+
+    env_logger::init();
 
     runtime.block_on(async move {
         execute_subcommand(args.command).await.unwrap();

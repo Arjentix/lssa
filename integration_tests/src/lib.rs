@@ -3,12 +3,13 @@ use std::{path::PathBuf, time::Duration};
 use actix_web::dev::ServerHandle;
 use anyhow::Result;
 use clap::Parser;
+use common::sequencer_client::SequencerClient;
 use log::info;
-use node_core::{Command, fetch_config, sequencer_client::SequencerClient};
 use sequencer_core::config::SequencerConfig;
 use sequencer_runner::startup_sequencer;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
+use wallet::{Command, helperfunctions::fetch_config};
 
 #[derive(Parser, Debug)]
 #[clap(version)]
@@ -78,9 +79,9 @@ pub async fn test_success() {
 
     let node_config = fetch_config().unwrap();
 
-    let seq_client = SequencerClient::new(node_config).unwrap();
+    let seq_client = SequencerClient::new(node_config.sequencer_addr.clone()).unwrap();
 
-    node_core::execute_subcommand(command).await.unwrap();
+    wallet::execute_subcommand(command).await.unwrap();
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
@@ -115,9 +116,9 @@ pub async fn test_success_move_to_another_account() {
 
     let node_config = fetch_config().unwrap();
 
-    let seq_client = SequencerClient::new(node_config).unwrap();
+    let seq_client = SequencerClient::new(node_config.sequencer_addr.clone()).unwrap();
 
-    node_core::execute_subcommand(command).await.unwrap();
+    wallet::execute_subcommand(command).await.unwrap();
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
@@ -150,9 +151,9 @@ pub async fn test_failure() {
 
     let node_config = fetch_config().unwrap();
 
-    let seq_client = SequencerClient::new(node_config).unwrap();
+    let seq_client = SequencerClient::new(node_config.sequencer_addr.clone()).unwrap();
 
-    node_core::execute_subcommand(command).await.unwrap();
+    wallet::execute_subcommand(command).await.unwrap();
 
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;

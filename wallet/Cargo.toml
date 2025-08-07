@@ -1,5 +1,5 @@
 [package]
-name = "node_core"
+name = "wallet"
 version = "0.1.0"
 edition = "2021"
 
@@ -28,9 +28,6 @@ path = "../sc_core"
 
 [dependencies.accounts]
 path = "../accounts"
-
-[dependencies.storage]
-path = "../storage"
 
 [dependencies.utxo]
 path = "../utxo"

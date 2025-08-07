@@ -50,7 +50,6 @@ pub fn produce_dummy_empty_transaction() -> Transaction {
         tweak: Default::default(),
         secret_r: Default::default(),
         sc_addr: Default::default(),
-        state_changes: Default::default(),
     };
 
     Transaction::new(body, SignaturePrivateKey::from_slice(&[1; 32]).unwrap())
@@ -77,7 +76,6 @@ pub fn create_dummy_private_transaction_random_signer(
         tweak: Tweak::new(&mut rng),
         secret_r: [0; 32],
         sc_addr: "sc_addr".to_string(),
-        state_changes: (serde_json::Value::Null, 0),
     };
     Transaction::new(body, SignaturePrivateKey::random(&mut rng))
 }
@@ -112,7 +110,6 @@ pub fn create_dummy_transaction_native_token_transfer(
         tweak: Tweak::new(&mut rng),
         secret_r: [0; 32],
         sc_addr: "sc_addr".to_string(),
-        state_changes: (serde_json::Value::Null, 0),
     };
     Transaction::new(body, signing_key)
 }

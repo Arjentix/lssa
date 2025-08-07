@@ -8,7 +8,7 @@ members = [
   "sequencer_rpc",
   "mempool",
   "zkvm",
-  "node_core",
+  "wallet",
   "sequencer_core",
   "common",
   "sc_core",
