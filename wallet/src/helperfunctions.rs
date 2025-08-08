@@ -1,5 +1,6 @@
 use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
+use accounts::account_core::Account;
 use anyhow::{anyhow, Result};
 
 use crate::{config::NodeConfig, HOME_DIR_ENV_VAR};
@@ -40,4 +41,25 @@ pub fn produce_account_addr_from_hex(hex_str: String) -> Result<[u8; 32]> {
     hex::decode(hex_str)?
         .try_into()
         .map_err(|_| anyhow!("Failed conversion to 32 bytes"))
+}
+
+///Fetch list of accounts stored at `NSSA_WALLET_HOME_DIR/curr_accounts.json`
+///
+/// If file not present, it is considered as empty list of persistent accounts
+pub fn fetch_persistent_accounts() -> Result<Vec<Account>> {
+    let home = get_home()?;
+    let accs_path = home.join("curr_accounts.json");
+
+    match File::open(accs_path) {
+        Ok(file) => {
+            let reader = BufReader::new(file);
+            Ok(serde_json::from_reader(reader)?)
+        }
+        Err(err) => match err.kind() {
+            std::io::ErrorKind::NotFound => Ok(vec![]),
+            _ => {
+                anyhow::bail!("IO error {err:#?}");
+            }
+        },
+    }
 }

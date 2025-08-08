@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use common::{
     execution_input::PublicNativeTokenSend,
@@ -14,11 +14,12 @@ use common::transaction::TransactionBody;
 use config::NodeConfig;
 use log::info;
 use sc_core::proofs_circuits::pedersen_commitment_vec;
-use tokio::sync::RwLock;
 
 use clap::{Parser, Subcommand};
 
-use crate::helperfunctions::{fetch_config, produce_account_addr_from_hex};
+use crate::helperfunctions::{
+    fetch_config, fetch_persistent_accounts, get_home, produce_account_addr_from_hex,
+};
 
 pub const HOME_DIR_ENV_VAR: &str = "NSSA_WALLET_HOME_DIR";
 pub const BLOCK_GEN_DELAY_SECS: u64 = 20;
@@ -29,7 +30,7 @@ pub mod helperfunctions;
 pub mod requests_structs;
 
 pub struct NodeCore {
-    pub storage: Arc<RwLock<NodeChainStore>>,
+    pub storage: NodeChainStore,
     pub node_config: NodeConfig,
     pub sequencer_client: Arc<SequencerClient>,
 }
@@ -43,20 +44,26 @@ impl NodeCore {
             storage.acc_map.insert(acc.address, acc);
         }
 
-        let wrapped_storage = Arc::new(RwLock::new(storage));
+        //Persistent accounts take precedence for initial accounts
+        let persistent_accounts = fetch_persistent_accounts()?;
+        for acc in persistent_accounts {
+            storage.acc_map.insert(acc.address, acc);
+        }
 
         Ok(Self {
-            storage: wrapped_storage,
+            storage,
             node_config: config.clone(),
             sequencer_client: client.clone(),
         })
     }
 
     pub async fn get_roots(&self) -> [[u8; 32]; 2] {
-        let storage = self.storage.read().await;
         [
-            storage.utxo_commitments_store.get_root().unwrap_or([0; 32]),
-            storage.pub_tx_store.get_root().unwrap_or([0; 32]),
+            self.storage
+                .utxo_commitments_store
+                .get_root()
+                .unwrap_or([0; 32]),
+            self.storage.pub_tx_store.get_root().unwrap_or([0; 32]),
         ]
     }
 
@@ -66,11 +73,7 @@ impl NodeCore {
 
         let addr = account.address;
 
-        {
-            let mut write_guard = self.storage.write().await;
-
-            write_guard.acc_map.insert(account.address, account);
-        }
+        self.storage.acc_map.insert(account.address, account);
 
         addr
     }
@@ -84,11 +87,7 @@ impl NodeCore {
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         let tx_roots = self.get_roots().await;
 
-        let public_context = {
-            let read_guard = self.storage.read().await;
-
-            read_guard.produce_context(from)
-        };
+        let public_context = self.storage.produce_context(from);
 
         let (tweak, secret_r, commitment) = pedersen_commitment_vec(
             //Will not panic, as public context is serializable
@@ -113,24 +112,52 @@ impl NodeCore {
             );
         tx.log();
 
-        {
-            let read_guard = self.storage.read().await;
+        let account = self.storage.acc_map.get(&from);
 
-            let account = read_guard.acc_map.get(&from);
+        if let Some(account) = account {
+            let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
 
-            if let Some(account) = account {
-                let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+            let signed_transaction = Transaction::new(tx, key_to_sign_transaction);
 
-                let signed_transaction = Transaction::new(tx, key_to_sign_transaction);
-
-                Ok(self
-                    .sequencer_client
-                    .send_tx(signed_transaction, tx_roots)
-                    .await?)
-            } else {
-                Err(ExecutionFailureKind::AmountMismatchError)
-            }
+            Ok(self
+                .sequencer_client
+                .send_tx(signed_transaction, tx_roots)
+                .await?)
+        } else {
+            Err(ExecutionFailureKind::AmountMismatchError)
         }
+    }
+
+    ///Dumps all accounts from acc_map at `path`
+    ///
+    ///Currently storing everything in one file
+    ///
+    ///ToDo: extend storage
+    pub fn store_present_accounts_at_path(&self, path: PathBuf) -> Result<PathBuf> {
+        let dump_path = path.join("curr_accounts.json");
+
+        let curr_accs: Vec<Account> = self
+            .storage
+            .acc_map
+            .values()
+            .cloned()
+            .collect();
+        let accs_serialized = serde_json::to_vec_pretty(&curr_accs)?;
+
+        let mut acc_file = File::create(&dump_path).unwrap();
+        acc_file.write_all(&accs_serialized).unwrap();
+
+        Ok(dump_path)
+    }
+
+    ///Dumps all accounts from acc_map at `NSSA_WALLET_HOME_DIR`
+    ///
+    ///Currently storing everything in one file
+    ///
+    ///ToDo: extend storage
+    pub fn store_present_accounts_at_home(&self) -> Result<PathBuf> {
+        let home = get_home()?;
+        self.store_present_accounts_at_path(home)
     }
 }
 
@@ -138,6 +165,7 @@ impl NodeCore {
 #[derive(Subcommand, Debug, Clone)]
 #[clap(about)]
 pub enum Command {
+    ///Send native token transfer from `from` to `to` for `amount`
     SendNativeTokenTransfer {
         ///from - valid 32 byte hex string
         #[arg(long)]
@@ -149,7 +177,12 @@ pub enum Command {
         #[arg(long)]
         amount: u64,
     },
-    DumpAccountsOnDisc,
+    ///Dump accounts at destination
+    DumpAccountsOnDisc {
+        ///Dump path for accounts
+        #[arg(short, long)]
+        dump_path: PathBuf,
+    },
 }
 
 ///To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -178,8 +211,14 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
 
             info!("Results of tx send is {res:#?}");
         }
-        Command::DumpAccountsOnDisc => {
-            info!("Accounts stored at path");
+        Command::DumpAccountsOnDisc { dump_path } => {
+            let node_config = fetch_config()?;
+
+            let wallet_core = NodeCore::start_from_config_update_chain(node_config).await?;
+
+            wallet_core.store_present_accounts_at_path(dump_path.clone())?;
+
+            info!("Accounts stored at path {dump_path:#?}");
         }
     }
 
