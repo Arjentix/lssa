@@ -255,7 +255,11 @@ mod tests {
         }
     }
 
-    fn json_handler_for_tests() -> (JsonHandler, Vec<AccountInitialData>) {
+    fn components_for_tests() -> (
+        JsonHandler,
+        Vec<AccountInitialData>,
+        nssa::PublicTransaction,
+    ) {
         let config = sequencer_config_for_tests();
         let mut sequencer_core = SequencerCore::start_from_config(config);
         let initial_accounts = sequencer_core.sequencer_config.initial_accounts.clone();
@@ -274,7 +278,9 @@ mod tests {
             nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
         let tx = nssa::PublicTransaction::new(message, witness_set);
 
-        sequencer_core.push_tx_into_mempool_pre_check(tx).unwrap();
+        sequencer_core
+            .push_tx_into_mempool_pre_check(tx.clone())
+            .unwrap();
 
         sequencer_core
             .produce_new_block_with_mempool_transactions()
@@ -288,6 +294,7 @@ mod tests {
                 sequencer_state: sequencer_core,
             },
             initial_accounts,
+            tx,
         )
     }
 
@@ -314,7 +321,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_account_balance_for_non_existent_account() {
-        let (json_handler, _) = json_handler_for_tests();
+        let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_account_balance",
@@ -336,7 +343,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_account_balance_for_invalid_hex() {
-        let (json_handler, _) = json_handler_for_tests();
+        let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_account_balance",
@@ -359,7 +366,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_account_balance_for_invalid_length() {
-        let (json_handler, _) = json_handler_for_tests();
+        let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_account_balance",
@@ -382,7 +389,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_account_balance_for_existing_account() {
-        let (json_handler, initial_accounts) = json_handler_for_tests();
+        let (json_handler, initial_accounts, _) = components_for_tests();
 
         let acc1_addr = initial_accounts[0].addr.clone();
 
@@ -407,7 +414,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_transaction_by_hash_for_non_existent_hash() {
-        let (json_handler, _) = json_handler_for_tests();
+        let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_transaction_by_hash",
@@ -429,7 +436,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_transaction_by_hash_for_invalid_hex() {
-        let (json_handler, _) = json_handler_for_tests();
+        let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_transaction_by_hash",
@@ -453,7 +460,7 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_transaction_by_hash_for_invalid_length() {
-        let (json_handler, _) = json_handler_for_tests();
+        let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_transaction_by_hash",
@@ -477,11 +484,12 @@ mod tests {
 
     #[actix_web::test]
     async fn test_get_transaction_by_hash_for_existing_transaction() {
-        let (json_handler, _) = json_handler_for_tests();
+        let (json_handler, _, tx) = components_for_tests();
+        let tx_hash_hex = hex::encode(tx.hash());
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_transaction_by_hash",
-            "params": { "hash":"fc96dbd7603f1f97bfd96c31e09c35dc877a436c4aa71437b3e8f5bbf69b77fc"},
+            "params": { "hash": tx_hash_hex},
             "id": 1
         });
 
