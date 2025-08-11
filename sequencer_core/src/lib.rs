@@ -76,7 +76,6 @@ impl SequencerCore {
     pub fn push_tx_into_mempool_pre_check(
         &mut self,
         transaction: nssa::PublicTransaction,
-        // _tx_roots: [[u8; 32]; 2],
     ) -> Result<(), TransactionMalformationErrorKind> {
         let mempool_size = self.mempool.len();
         if mempool_size >= self.sequencer_config.max_num_tx_in_block {
@@ -300,7 +299,6 @@ mod tests {
         common_setup(&mut sequencer);
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
-        // let tx_roots = sequencer.get_tree_roots();
         let result = sequencer.transaction_pre_check(tx);
 
         assert!(result.is_ok());
@@ -387,7 +385,7 @@ mod tests {
         let tx = common::test_utils::create_transaction_native_token_transfer(
             acc1, 0, acc2, 10000000, sign_key1,
         );
-        // let tx_roots = sequencer.get_tree_roots();
+
         let result = sequencer.transaction_pre_check(tx);
 
         //Passed pre-check
@@ -452,7 +450,6 @@ mod tests {
         common_setup(&mut sequencer);
 
         let tx = common::test_utils::produce_dummy_empty_transaction();
-        // let tx_roots = sequencer.get_tree_roots();
 
         // Fill the mempool
         sequencer.mempool.push_item(tx.clone());
