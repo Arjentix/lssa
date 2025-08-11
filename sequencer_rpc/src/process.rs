@@ -88,7 +88,7 @@ impl JsonHandler {
         {
             let mut state = self.sequencer_state.lock().await;
 
-            state.push_tx_into_mempool_pre_check(send_tx_req.transaction, send_tx_req.tx_roots)?;
+            state.push_tx_into_mempool_pre_check(send_tx_req.transaction)?;
         }
 
         let helperstruct = SendTxResponse {
@@ -287,13 +287,10 @@ mod tests {
             tweak: Default::default(),
             secret_r: Default::default(),
             sc_addr: Default::default(),
-            state_changes: Default::default(),
         };
         let tx = Transaction::new(tx_body, SignaturePrivateKey::from_slice(&[1; 32]).unwrap());
 
-        sequencer_core
-            .push_tx_into_mempool_pre_check(tx, [[0; 32]; 2])
-            .unwrap();
+        sequencer_core.push_tx_into_mempool_pre_check(tx).unwrap();
         sequencer_core
             .produce_new_block_with_mempool_transactions()
             .unwrap();
@@ -499,7 +496,7 @@ mod tests {
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_transaction_by_hash",
-            "params": { "hash": "a5210ef33912a448cfe6eda43878c144df81f7bdf51d19b5ddf97be11806a6ed"},
+            "params": { "hash": "2c69b9639bcf8d58509204e18f1d5962029bf26840915f2bf2bb434501ad3c38"},
             "id": 1
         });
 
@@ -518,14 +515,13 @@ mod tests {
                         "nullifier_created_hashes": [],
                         "sc_addr": "",
                         "secret_r": vec![0; 32],
-                        "state_changes": [null, 0],
                         "tweak": "0".repeat(64),
                         "tx_kind": "Shielded",
                         "utxo_commitments_created_hashes": [],
                         "utxo_commitments_spent_hashes": [],
                     },
                     "public_key": "3056301006072A8648CE3D020106052B8104000A034200041B84C5567B126440995D3ED5AABA0565D71E1834604819FF9C17F5E9D5DD078F70BEAF8F588B541507FED6A642C5AB42DFDF8120A7F639DE5122D47A69A8E8D1",
-                    "signature": "A4E0D6A25BE829B006124F0DFD766427967AA3BEA96C29219E79BB2CC871891F384748C27E28718A4450AA78709FBF1A57DB33BCD575A2C819D2A439C2D878E6"
+                    "signature": "D75783642EA6E7D5E13AE8CCD3C2D3F82728C0A778A80C9F2976C739CD9F7F3F240B0532954D87761DE299A6CB9E6606295786BA5D0F5CACAB3F3626724528B1"
                 }
             }
         });
