@@ -217,6 +217,7 @@ mod tests {
     use std::sync::Arc;
 
     use crate::{rpc_handler, JsonHandler};
+    use base64::{engine::general_purpose, Engine};
     use common::rpc_primitives::RpcPollingConfig;
 
     use sequencer_core::{
@@ -494,6 +495,8 @@ mod tests {
     async fn test_get_transaction_by_hash_for_existing_transaction() {
         let (json_handler, _, tx) = components_for_tests();
         let tx_hash_hex = hex::encode(tx.hash());
+        let expected_base64_encoded = general_purpose::STANDARD.encode(tx.to_bytes());
+
         let request = serde_json::json!({
             "jsonrpc": "2.0",
             "method": "get_transaction_by_hash",
@@ -505,7 +508,7 @@ mod tests {
             "id": 1,
             "jsonrpc": "2.0",
             "result": {
-                "transaction": "TlNTQS92MC4xL1R4TWVzc2FnZTYHPd+eRGuYF2kuC9CQp8t7bp1UuMIyqCp4yOzP4zCBAgAAABuExVZ7EmRAmV0+1aq6BWXXHhg0YEgZ/5wX9enV3QePAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIBAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAKAAAAAAAAAAAAAAAAAAAAAQAAAKvsz0Lg2apthMPOsOhYarLVuZmMeUYDneKtr95L7Ia6C+Z3/dw3CAtb2wIa4/Ow5JwatpstOGwC9uS2mySzf9UbhMVWexJkQJldPtWqugVl1x4YNGBIGf+cF/Xp1d0Hjw==",
+                "transaction": expected_base64_encoded,
             }
         });
         let response = call_rpc_handler_with_json(json_handler, request).await;
