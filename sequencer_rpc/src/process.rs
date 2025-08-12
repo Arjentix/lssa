@@ -1,3 +1,4 @@
+use accounts::account_core::address::AccountAddress;
 use actix_web::Error as HttpError;
 use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
@@ -72,7 +73,7 @@ impl JsonHandler {
         {
             let mut acc_store = self.sequencer_state.lock().await;
 
-            acc_store.register_account(acc_req.address);
+            acc_store.register_account(AccountAddress::new(acc_req.address));
         }
 
         let helperstruct = RegisterAccountResponse {

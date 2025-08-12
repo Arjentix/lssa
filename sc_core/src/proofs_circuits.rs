@@ -1,3 +1,4 @@
+use accounts::account_core::address::AccountAddress;
 use bincode;
 use common::merkle_tree_public::merkle_tree::UTXOCommitmentsMerkleTree;
 use rand::{thread_rng, RngCore};
@@ -82,7 +83,7 @@ pub fn private_circuit(
     for in_utxo in input_utxos {
         let nullifier_public_key = public_context
             .account_masks
-            .get(&in_utxo.owner)
+            .get(&AccountAddress::new(in_utxo.owner))
             .unwrap()
             .nullifier_public_key;
 
@@ -125,7 +126,7 @@ pub fn deshielded_circuit(
     for in_utxo in input_utxos {
         let nullifier_public_key = public_context
             .account_masks
-            .get(&in_utxo.owner)
+            .get(&AccountAddress::new(in_utxo.owner))
             .unwrap()
             .nullifier_public_key;
 

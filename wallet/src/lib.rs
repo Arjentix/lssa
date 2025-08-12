@@ -86,9 +86,9 @@ impl WalletCore {
         let tx: TransactionBody =
             sc_core::transaction_payloads_tools::create_public_transaction_payload(
                 serde_json::to_vec(&PublicNativeTokenSend {
-                    from,
+                    from: from.raw_addr(),
                     nonce,
-                    to,
+                    to: to.raw_addr(),
                     balance_to_move,
                 })
                 .unwrap(),
