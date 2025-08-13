@@ -8,7 +8,6 @@ members = [
   "utxo",
   "sequencer_rpc",
   "mempool",
-  "zkvm",
   "wallet",
   "sequencer_core",
   "common",

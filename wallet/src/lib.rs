@@ -42,9 +42,6 @@ impl WalletCore {
 
         //Persistent accounts take precedence for initial accounts
         let persistent_accounts = fetch_persistent_accounts()?;
-
-        info!("Fetched persistent accoounts {persistent_accounts:#?}");
-
         for acc in persistent_accounts {
             storage.acc_map.insert(acc.address, acc);
         }

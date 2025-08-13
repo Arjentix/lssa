@@ -1,5 +1,6 @@
 pub mod address;
 pub mod error;
+pub mod gas_calculator;
 pub mod program;
 pub mod public_transaction;
 mod signature;

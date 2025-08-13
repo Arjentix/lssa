@@ -32,9 +32,6 @@ path = "../accounts"
 [dependencies.utxo]
 path = "../utxo"
 
-[dependencies.zkvm]
-path = "../zkvm"
-
 [dependencies.nssa]
 path = "../nssa"
 
