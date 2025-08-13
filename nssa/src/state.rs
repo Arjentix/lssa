@@ -5,8 +5,8 @@ use nssa_core::{account::Account, program::ProgramId};
 use std::collections::HashMap;
 
 pub struct V01State {
-    public_state: HashMap<Address, Account>,
-    builtin_programs: HashMap<ProgramId, Program>,
+    pub(crate) public_state: HashMap<Address, Account>,
+    pub(crate) builtin_programs: HashMap<ProgramId, Program>,
 }
 
 impl V01State {

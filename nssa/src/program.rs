@@ -8,6 +8,7 @@ use serde::Serialize;
 
 use crate::error::NssaError;
 
+#[derive(Debug, PartialEq, Eq)]
 pub struct Program {
     pub(crate) id: ProgramId,
     pub(crate) elf: &'static [u8],
