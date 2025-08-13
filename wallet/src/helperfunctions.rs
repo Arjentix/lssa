@@ -1,6 +1,7 @@
 use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
-use anyhow::{anyhow, Result};
+use anyhow::Result;
+use nssa::{address::HexString, Address};
 
 use crate::{config::WalletConfig, HOME_DIR_ENV_VAR};
 
@@ -19,8 +20,6 @@ pub fn fetch_config() -> Result<WalletConfig> {
 }
 
 //ToDo: Replace with structures conversion in future
-pub fn produce_account_addr_from_hex(hex_str: String) -> Result<[u8; 32]> {
-    hex::decode(hex_str)?
-        .try_into()
-        .map_err(|_| anyhow!("Failed conversion to 32 bytes"))
+pub fn produce_account_addr_from_hex(hex_str: String) -> Result<Address> {
+    Ok(HexString::try_from(hex_str.as_str())?.into())
 }

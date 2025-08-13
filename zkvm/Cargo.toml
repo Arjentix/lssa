@@ -24,6 +24,9 @@ path = "../utxo"
 [dependencies.common]
 path = "../common"
 
+[dependencies.nssa]
+path = "../nssa"
+
 [features]
 cuda = ["risc0-zkvm/cuda"]
 default = []

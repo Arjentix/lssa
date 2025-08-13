@@ -1,9 +1,8 @@
 use std::path::Path;
 
-use accounts::account_core::address::AccountAddress;
 use block_store::SequecerBlockStore;
 use common::block::HashableBlockData;
-use nssa;
+use nssa::{self, Address};
 use rand::{rngs::OsRng, RngCore};
 
 use crate::config::AccountInitialData;
@@ -22,7 +21,7 @@ impl SequecerChainStore {
         is_genesis_random: bool,
         initial_accounts: &[AccountInitialData],
     ) -> Self {
-        let init_accs: Vec<(AccountAddress, u128)> = initial_accounts
+        let init_accs: Vec<(Address, u128)> = initial_accounts
             .iter()
             .map(|acc_data| {
                 (

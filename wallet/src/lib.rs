@@ -5,11 +5,12 @@ use common::{
     ExecutionFailureKind,
 };
 
-use accounts::account_core::{address::AccountAddress, Account};
+use accounts::account_core::Account;
 use anyhow::Result;
 use chain_storage::WalletChainStore;
 use config::WalletConfig;
 use log::info;
+use nssa::Address;
 use tokio::sync::RwLock;
 
 use clap::{Parser, Subcommand};
@@ -47,7 +48,7 @@ impl WalletCore {
         })
     }
 
-    pub async fn create_new_account(&mut self) -> AccountAddress {
+    pub async fn create_new_account(&mut self) -> Address {
         let account = Account::new();
         account.log();
 
@@ -64,9 +65,9 @@ impl WalletCore {
 
     pub async fn send_public_native_token_transfer(
         &self,
-        from: AccountAddress,
+        from: Address,
         nonce: u128,
-        to: AccountAddress,
+        to: Address,
         balance_to_move: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
         {
@@ -75,7 +76,7 @@ impl WalletCore {
             let account = read_guard.acc_map.get(&from);
 
             if let Some(account) = account {
-                let addresses = vec![nssa::Address::new(from), nssa::Address::new(to)];
+                let addresses = vec![from, to];
                 let nonces = vec![nonce];
                 let program_id = nssa::program::Program::authenticated_transfer_program().id();
                 let message = nssa::public_transaction::Message::try_new(
