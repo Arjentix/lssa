@@ -45,26 +45,13 @@ impl Program {
 
         // Get outputs
         let ProgramOutput {
-            post_states: mut post_states,
-            ..
+            mut post_states, ..
         } = session_info
             .journal
             .decode()
             .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
 
-        // TODO: Move this logic to `V01State::transition_from_public_transaction`.
-        self.claim_accounts_with_default_program_owner(&mut post_states);
-
         Ok(post_states)
-    }
-
-    fn claim_accounts_with_default_program_owner(&self, post_states: &mut [Account]) {
-        // Claim any output account with default program owner field
-        for account in post_states.iter_mut() {
-            if account.program_owner == DEFAULT_PROGRAM_ID {
-                account.program_owner = self.id;
-            }
-        }
     }
 
     /// Executes and proves the program `P`.
@@ -218,13 +205,10 @@ mod tests {
 
         let expected_sender_post = Account {
             balance: 77665544332211 - balance_to_move,
-            program_owner: program.id(),
             ..Account::default()
         };
         let expected_recipient_post = Account {
             balance: balance_to_move,
-            // Program claims the account since the pre_state has default prorgam owner
-            program_owner: program.id(),
             ..Account::default()
         };
         let [sender_post, recipient_post] = program

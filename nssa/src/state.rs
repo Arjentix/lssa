@@ -1,7 +1,10 @@
 use crate::{
     address::Address, error::NssaError, program::Program, public_transaction::PublicTransaction,
 };
-use nssa_core::{account::Account, program::ProgramId};
+use nssa_core::{
+    account::Account,
+    program::{DEFAULT_PROGRAM_ID, ProgramId},
+};
 use std::collections::HashMap;
 
 pub struct V01State {
@@ -48,7 +51,12 @@ impl V01State {
 
         for (address, post) in state_diff.into_iter() {
             let current_account = self.get_account_by_address_mut(address);
+
             *current_account = post;
+            // The invoked program claims the accounts with default program id.
+            if current_account.program_owner == DEFAULT_PROGRAM_ID {
+                current_account.program_owner = tx.message().program_id;
+            }
         }
 
         for address in tx.signer_addresses() {
