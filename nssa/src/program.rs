@@ -3,7 +3,9 @@ use nssa_core::{
     program::{DEFAULT_PROGRAM_ID, InstructionData, ProgramId},
 };
 use program_methods::{AUTHENTICATED_TRANSFER_ELF, AUTHENTICATED_TRANSFER_ID};
-use risc0_zkvm::{ExecutorEnv, ExecutorEnvBuilder, default_executor, serde::to_vec};
+use risc0_zkvm::{
+    ExecutorEnv, ExecutorEnvBuilder, Receipt, default_executor, default_prover, serde::to_vec,
+};
 use serde::Serialize;
 
 use crate::error::NssaError;
@@ -47,21 +49,39 @@ impl Program {
             .decode()
             .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
 
+        // TODO: Move this logic to `V01State::transition_from_public_transaction`.
+        self.claim_accounts_with_default_program_owner(&mut post_states);
+
+        Ok(post_states)
+    }
+
+    fn claim_accounts_with_default_program_owner(&self, post_states: &mut [Account]) {
         // Claim any output account with default program owner field
         for account in post_states.iter_mut() {
             if account.program_owner == DEFAULT_PROGRAM_ID {
                 account.program_owner = self.id;
             }
         }
-
-        Ok(post_states)
     }
 
-    pub fn prove(
+    /// Executes and proves the program `P`.
+    /// Returns the proof
+    fn execute_and_prove(
         &self,
         pre_states: &[AccountWithMetadata],
         instruction_data: &InstructionData,
-    ) {
+    ) -> Result<Receipt, NssaError> {
+        // Write inputs to the program
+        let mut env_builder = ExecutorEnv::builder();
+        Self::write_inputs(pre_states, instruction_data, &mut env_builder)?;
+        let env = env_builder.build().unwrap();
+
+        // Prove the program
+        let prover = default_prover();
+        let prove_info = prover
+            .prove(env, self.elf)
+            .map_err(|e| NssaError::ProgramProveFailed(e.to_string()))?;
+        Ok(prove_info.receipt)
     }
 
     /// Writes inputs to `env_builder` in the order expected by the programs
@@ -73,7 +93,7 @@ impl Program {
         let pre_states = pre_states.to_vec();
         env_builder
             .write(&(pre_states, instruction_data))
-            .map_err(|e| NssaError::ProgramExecutionFailed(e.to_string()))?;
+            .map_err(|e| NssaError::ProgramWriteInputFailed(e.to_string()))?;
         Ok(())
     }
 
@@ -209,5 +229,46 @@ mod tests {
 
         assert_eq!(sender_post, expected_sender_post);
         assert_eq!(recipient_post, expected_recipient_post);
+    }
+
+    #[test]
+    fn test_program_execute_and_prove() {
+        let program = Program::simple_balance_transfer();
+        let balance_to_move: u128 = 11223344556677;
+        let instruction_data = Program::serialize_instruction(balance_to_move).unwrap();
+        let sender = AccountWithMetadata {
+            account: Account {
+                balance: 77665544332211,
+                ..Account::default()
+            },
+            is_authorized: false,
+        };
+        let recipient = AccountWithMetadata {
+            account: Account::default(),
+            is_authorized: false,
+        };
+
+        let expected_sender_post = Account {
+            balance: 77665544332211 - balance_to_move,
+            ..Account::default()
+        };
+        let expected_recipient_post = Account {
+            balance: balance_to_move,
+            ..Account::default()
+        };
+        let receipt = program
+            .execute_and_prove(&[sender, recipient], &instruction_data)
+            .unwrap();
+        let [sender_post, recipient_post] = receipt
+            .journal
+            .decode::<Vec<Account>>()
+            .unwrap()
+            .try_into()
+            .unwrap();
+
+        let output = assert_eq!(sender_post, expected_sender_post);
+
+        assert_eq!(recipient_post, expected_recipient_post);
+        assert!(receipt.verify(program.id()).is_ok());
     }
 }

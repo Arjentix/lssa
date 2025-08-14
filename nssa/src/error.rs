@@ -7,9 +7,6 @@ pub enum NssaError {
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
-    #[error("Risc0 error: {0}")]
-    ProgramExecutionFailed(String),
-
     #[error("Program violated execution rules")]
     InvalidProgramBehavior,
 
@@ -24,4 +21,14 @@ pub enum NssaError {
 
     #[error("Invalid Public Key")]
     InvalidPublicKey,
+
+    #[error("Risc0 error: {0}")]
+    ProgramWriteInputFailed(String),
+
+    #[error("Risc0 error: {0}")]
+    ProgramExecutionFailed(String),
+
+    #[error("Risc0 error: {0}")]
+    ProgramProveFailed(String),
+
 }
