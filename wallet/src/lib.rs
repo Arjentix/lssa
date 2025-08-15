@@ -1,19 +1,15 @@
 use std::sync::Arc;
 
 use common::{
-    execution_input::PublicNativeTokenSend,
     sequencer_client::{json::SendTxResponse, SequencerClient},
-    transaction::Transaction,
     ExecutionFailureKind,
 };
 
 use accounts::account_core::{address::AccountAddress, Account};
 use anyhow::Result;
 use chain_storage::WalletChainStore;
-use common::transaction::TransactionBody;
 use config::WalletConfig;
 use log::info;
-use sc_core::proofs_circuits::pedersen_commitment_vec;
 use tokio::sync::RwLock;
 
 use clap::{Parser, Subcommand};
@@ -69,50 +65,34 @@ impl WalletCore {
     pub async fn send_public_native_token_transfer(
         &self,
         from: AccountAddress,
-        nonce: u64,
+        nonce: u128,
         to: AccountAddress,
-        balance_to_move: u64,
+        balance_to_move: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
-        let public_context = {
-            let read_guard = self.storage.read().await;
-
-            read_guard.produce_context(from)
-        };
-
-        let (tweak, secret_r, commitment) = pedersen_commitment_vec(
-            //Will not panic, as public context is serializable
-            public_context.produce_u64_list_from_context().unwrap(),
-        );
-
-        let sc_addr = hex::encode([0; 32]);
-
-        let tx: TransactionBody =
-            sc_core::transaction_payloads_tools::create_public_transaction_payload(
-                serde_json::to_vec(&PublicNativeTokenSend {
-                    from,
-                    nonce,
-                    to,
-                    balance_to_move,
-                })
-                .unwrap(),
-                commitment,
-                tweak,
-                secret_r,
-                sc_addr,
-            );
-        tx.log();
-
         {
             let read_guard = self.storage.read().await;
 
             let account = read_guard.acc_map.get(&from);
 
             if let Some(account) = account {
-                let key_to_sign_transaction = account.key_holder.get_pub_account_signing_key();
+                let addresses = vec![nssa::Address::new(from), nssa::Address::new(to)];
+                let nonces = vec![nonce];
+                let program_id = nssa::program::Program::authenticated_transfer_program().id();
+                let message = nssa::public_transaction::Message::try_new(
+                    program_id,
+                    addresses,
+                    nonces,
+                    balance_to_move,
+                )
+                .unwrap();
 
-                let signed_transaction = Transaction::new(tx, key_to_sign_transaction);
+                let signing_key = account.key_holder.get_pub_account_signing_key();
+                let witness_set =
+                    nssa::public_transaction::WitnessSet::for_message(&message, &[signing_key]);
 
-                Ok(self.sequencer_client.send_tx(signed_transaction).await?)
+                let tx = nssa::PublicTransaction::new(message, witness_set);
+
+                Ok(self.sequencer_client.send_tx(tx).await?)
             } else {
                 Err(ExecutionFailureKind::AmountMismatchError)
             }
@@ -128,15 +108,15 @@ pub enum Command {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
-        ///nonce - u64 integer
+        ///nonce - u128 integer
         #[arg(long)]
-        nonce: u64,
+        nonce: u128,
         ///to - valid 32 byte hex string
         #[arg(long)]
         to: String,
         ///amount - amount of balance to move
         #[arg(long)]
-        amount: u64,
+        amount: u128,
     },
 }
 
