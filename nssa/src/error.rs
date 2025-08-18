@@ -31,4 +31,9 @@ pub enum NssaError {
     #[error("Risc0 error: {0}")]
     ProgramProveFailed(String),
 
+    #[error("Invalid transaction: {0}")]
+    TransactionDeserializationError(String),
+
+    #[error("Core error")]
+    Core(#[from] nssa_core::error::NssaCoreError),
 }

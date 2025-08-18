@@ -146,3 +146,8 @@ fn n_unique<T: Eq + Hash>(data: &[T]) -> usize {
     let set: HashSet<&T> = data.iter().collect();
     set.len()
 }
+
+#[cfg(test)]
+mod tests {
+
+}

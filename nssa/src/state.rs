@@ -21,6 +21,10 @@ impl CommitmentSet {
         // TODO: implement
         [0; 8]
     }
+
+    fn contains(&self, commitment: &Commitment) -> bool {
+        self.0.contains(commitment)
+    }
 }
 
 type NullifierSet = HashSet<Nullifier>;
@@ -139,14 +143,28 @@ impl V01State {
         &self,
         new_commitments: &[Commitment],
     ) -> Result<(), NssaError> {
-        todo!()
+        for commitment in new_commitments.iter() {
+            if self.private_state.0.contains(commitment) {
+                return Err(NssaError::InvalidInput(
+                    "Commitment already seen".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 
     pub(crate) fn check_nullifiers_are_new(
         &self,
         new_nullifiers: &[Nullifier],
     ) -> Result<(), NssaError> {
-        todo!()
+        for nullifier in new_nullifiers.iter() {
+            if self.private_state.1.contains(nullifier) {
+                return Err(NssaError::InvalidInput(
+                    "Nullifier already seen".to_string(),
+                ));
+            }
+        }
+        Ok(())
     }
 }
 

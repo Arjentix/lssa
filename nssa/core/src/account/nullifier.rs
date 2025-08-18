@@ -23,7 +23,7 @@ impl From<&NullifierSecretKey> for NullifierPublicKey {
 pub type NullifierSecretKey = [u8; 32];
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Nullifier([u8; 32]);
+pub struct Nullifier(pub(super) [u8; 32]);
 
 impl Nullifier {
     pub fn new(commitment: &Commitment, nsk: &NullifierSecretKey) -> Self {
@@ -53,12 +53,12 @@ mod tests {
     #[test]
     fn test_from_secret_key() {
         let nsk = [
-            50, 139, 109, 225, 82, 86, 80, 108, 140, 248, 232, 229, 96, 80, 148, 250, 15, 9, 155,
-            44, 196, 224, 115, 180, 160, 44, 113, 133, 15, 196, 253, 42,
+            57, 5, 64, 115, 153, 56, 184, 51, 207, 238, 99, 165, 147, 214, 213, 151, 30, 251, 30,
+            196, 134, 22, 224, 211, 237, 120, 136, 225, 188, 220, 249, 28,
         ];
         let expected_Npk = NullifierPublicKey([
-            38, 90, 215, 216, 195, 66, 157, 77, 161, 59, 121, 18, 118, 37, 57, 199, 189, 251, 95,
-            130, 12, 9, 171, 169, 140, 221, 87, 242, 46, 243, 111, 85,
+            202, 120, 42, 189, 194, 218, 78, 244, 31, 6, 108, 169, 29, 61, 22, 221, 69, 138, 197,
+            161, 241, 39, 142, 242, 242, 50, 188, 201, 99, 28, 176, 238,
         ]);
         let Npk = NullifierPublicKey::from(&nsk);
         assert_eq!(Npk, expected_Npk);

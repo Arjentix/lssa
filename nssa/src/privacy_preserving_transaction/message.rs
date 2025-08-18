@@ -36,7 +36,7 @@ impl Message {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use nssa_core::account::{
         Account, Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey,
     };

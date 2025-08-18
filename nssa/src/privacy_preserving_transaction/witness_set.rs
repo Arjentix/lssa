@@ -9,7 +9,7 @@ pub struct WitnessSet {
 }
 
 impl WitnessSet {
-    pub fn for_message(message: &Message, private_keys: &[&PrivateKey]) -> Self {
+    pub fn for_message(message: &Message, proof: Proof, private_keys: &[&PrivateKey]) -> Self {
         todo!()
     }
 

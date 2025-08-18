@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+#[cfg(feature = "host")]
+use crate::error::NssaCoreError;
 use crate::{
     account::{
         Account, AccountWithMetadata, Commitment, Nonce, Nullifier, NullifierPublicKey,
@@ -8,8 +10,14 @@ use crate::{
     program::{ProgramId, ProgramOutput},
 };
 
+#[cfg(feature = "host")]
+use std::io::Cursor;
+
 pub mod account;
 pub mod program;
+
+#[cfg(feature = "host")]
+pub mod error;
 
 pub type CommitmentSetDigest = [u32; 8];
 pub type MembershipProof = Vec<[u8; 32]>;
@@ -50,6 +58,18 @@ impl EncryptedAccountData {
     ) -> Self {
         // TODO: implement
         Self
+    }
+
+    #[cfg(feature = "host")]
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
+        todo!()
+    }
+}
+
+impl EncryptedAccountData {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        // TODO: implement
+        vec![0]
     }
 }
 

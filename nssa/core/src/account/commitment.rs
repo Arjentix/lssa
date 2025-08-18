@@ -13,7 +13,21 @@ impl Commitment {
     pub fn new(Npk: &NullifierPublicKey, account: &Account) -> Self {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(&Npk.to_byte_array());
-        bytes.extend_from_slice(&account.to_bytes());
+        let account_bytes_with_hashed_data = {
+            let mut this = Vec::new();
+            for word in &account.program_owner {
+                this.extend_from_slice(&word.to_le_bytes());
+            }
+            this.extend_from_slice(&account.balance.to_le_bytes());
+            this.extend_from_slice(&account.nonce.to_le_bytes());
+            let hashed_data: [u8; 32] = Impl::hash_bytes(&account.data)
+                .as_bytes()
+                .try_into()
+                .unwrap();
+            this.extend_from_slice(&hashed_data);
+            this
+        };
+        bytes.extend_from_slice(&account_bytes_with_hashed_data);
         Self(Impl::hash_bytes(&bytes).as_bytes().try_into().unwrap())
     }
 }

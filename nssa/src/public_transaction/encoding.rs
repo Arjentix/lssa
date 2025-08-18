@@ -8,8 +8,9 @@ use crate::{
     public_transaction::{Message, WitnessSet},
 };
 
-const MESSAGE_ENCODING_PREFIX_LEN: usize = 19;
-const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] = b"NSSA/v0.1/TxMessage";
+const MESSAGE_ENCODING_PREFIX_LEN: usize = 37;
+const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] =
+    b"NSSA/v0.1/TxMessage/Public\0\0\0\0\0\0\0\0\0\0\0";
 
 impl Message {
     /// Serializes a `Message` into bytes in the following layout:
@@ -52,7 +53,12 @@ impl Message {
             cursor.read_exact(&mut this)?;
             this
         };
-        assert_eq!(&prefix, MESSAGE_ENCODING_PREFIX);
+        if &prefix != MESSAGE_ENCODING_PREFIX {
+            return Err(NssaError::TransactionDeserializationError(
+                "Invalid public message prefix".to_string(),
+            ));
+        }
+
         let program_id: ProgramId = {
             let mut this = [0u32; 8];
             for item in &mut this {
