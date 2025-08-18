@@ -3,7 +3,7 @@ use risc0_zkvm::{
     sha::{Impl, Sha256},
 };
 
-use crate::account::Account;
+use crate::account::{Account, Commitment, NullifierPublicKey};
 
 impl Account {
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -16,6 +16,19 @@ impl Account {
         let hashed_data: [u8; 32] = Impl::hash_bytes(&self.data).as_bytes().try_into().unwrap();
         bytes.extend_from_slice(&hashed_data);
         bytes
+    }
+}
+
+impl Commitment {
+    pub(crate) fn to_bytes(&self) -> [u8; 32] {
+        self.0
+    }
+}
+
+
+impl NullifierPublicKey {
+    pub(crate) fn to_bytes(&self) -> [u8; 32] {
+        self.0
     }
 }
 
