@@ -37,14 +37,15 @@ impl Message {
 
 #[cfg(test)]
 pub mod tests {
+    use std::io::Cursor;
+
     use nssa_core::account::{
         Account, Commitment, Nullifier, NullifierPublicKey, NullifierSecretKey,
     };
 
     use crate::{Address, privacy_preserving_transaction::message::Message};
 
-    #[test]
-    fn test_constructor() {
+    fn message_for_tests() -> Message {
         let account1 = Account::default();
         let account2 = Account::default();
 
@@ -67,24 +68,41 @@ pub mod tests {
         let old_commitment = Commitment::new(&Npk1, &account1);
         let new_nullifiers = vec![Nullifier::new(&old_commitment, &nsk1)];
 
-        let expected_message = Message {
+        Message {
             public_addresses: public_addresses.clone(),
             nonces: nonces.clone(),
             public_post_states: public_post_states.clone(),
             encrypted_private_post_states: encrypted_private_post_states.clone(),
             new_commitments: new_commitments.clone(),
             new_nullifiers: new_nullifiers.clone(),
-        };
+        }
+    }
+
+    #[test]
+    fn test_constructor() {
+        let message = message_for_tests();
+        let expected_message = message.clone();
 
         let message = Message::new(
-            public_addresses,
-            nonces,
-            public_post_states,
-            encrypted_private_post_states,
-            new_commitments,
-            new_nullifiers,
+            message.public_addresses,
+            message.nonces,
+            message.public_post_states,
+            message.encrypted_private_post_states,
+            message.new_commitments,
+            message.new_nullifiers,
         );
 
         assert_eq!(message, expected_message);
+    }
+
+    #[test]
+    fn test_message_serialization_roundtrip() {
+        let message = message_for_tests();
+
+        let bytes = message.to_bytes();
+        let mut cursor = Cursor::new(bytes.as_ref());
+        let message_from_cursor = Message::from_cursor(&mut cursor).unwrap();
+
+        assert_eq!(message, message_from_cursor);
     }
 }

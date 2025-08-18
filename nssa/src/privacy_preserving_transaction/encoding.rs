@@ -39,18 +39,21 @@ impl Message {
         // Encrypted post states
         let encrypted_accounts_post_states_len: u32 =
             self.encrypted_private_post_states.len() as u32;
+        bytes.extend_from_slice(&encrypted_accounts_post_states_len.to_le_bytes());
         for encrypted_account in &self.encrypted_private_post_states {
             bytes.extend_from_slice(&encrypted_account.to_bytes());
         }
 
         // New commitments
         let new_commitments_len: u32 = self.new_commitments.len() as u32;
+        bytes.extend_from_slice(&new_commitments_len.to_le_bytes());
         for commitment in &self.new_commitments {
             bytes.extend_from_slice(&commitment.to_byte_array());
         }
 
         // New nullifiers
         let new_nullifiers_len: u32 = self.new_nullifiers.len() as u32;
+        bytes.extend_from_slice(&new_nullifiers_len.to_le_bytes());
         for nullifier in &self.new_nullifiers {
             bytes.extend_from_slice(&nullifier.to_byte_array());
         }
@@ -58,11 +61,6 @@ impl Message {
     }
 
     pub(crate) fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
-        let prefix = {
-            let mut this = [0u8; MESSAGE_ENCODING_PREFIX_LEN];
-            cursor.read_exact(&mut this)?;
-            this
-        };
         let prefix = {
             let mut this = [0u8; MESSAGE_ENCODING_PREFIX_LEN];
             cursor.read_exact(&mut this)?;
@@ -138,3 +136,6 @@ impl Message {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {}

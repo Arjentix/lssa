@@ -47,7 +47,7 @@ impl Tag {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
-pub struct EncryptedAccountData;
+pub struct EncryptedAccountData(u8);
 
 impl EncryptedAccountData {
     pub fn new(
@@ -57,12 +57,13 @@ impl EncryptedAccountData {
         Ivk: &IncomingViewingPublicKey,
     ) -> Self {
         // TODO: implement
-        Self
+        Self(0)
     }
 
     #[cfg(feature = "host")]
     pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
-        todo!()
+        let dummy_value = EncryptedAccountData(0);
+        Ok(dummy_value)
     }
 }
 
