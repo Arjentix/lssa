@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use sha2::{Digest, Sha256};
 
@@ -19,7 +19,7 @@ fn hash_value(value: &Value) -> Node {
     hasher.finalize().into()
 }
 
-#[derive(Debug)]
+#[cfg_attr(test, derive(Debug, PartialEq, Eq))]
 pub struct MerkleTree {
     index_map: HashMap<Value, usize>,
     node_map: HashMap<usize, Node>,
@@ -32,8 +32,78 @@ impl MerkleTree {
         *self.node_map.get(&0).unwrap()
     }
 
-    pub fn new(mut values: Vec<Value>) -> Self {
-        Self::deduplicate_values(&mut values);
+    pub fn with_capacity(capacity: usize) -> Self {
+        let base_length = capacity.next_power_of_two();
+        let mut node_map = HashMap::<usize, Node>::new();
+        let mut current_layer_length = base_length;
+        let mut default_value_index = 0;
+        while current_layer_length > 0 {
+            let first_index = current_layer_length - 1;
+            let default_layer_value = default_values::DEFAULT_VALUES[default_value_index];
+            let new_layer = (first_index..(first_index + current_layer_length))
+                .map(|index| (index, default_layer_value))
+                .collect::<HashMap<_, _>>();
+            node_map.extend(new_layer);
+
+            current_layer_length >>= 1;
+            default_value_index += 1;
+        }
+        Self {
+            index_map: HashMap::new(),
+            node_map,
+            capacity: base_length,
+            length: 0,
+        }
+    }
+
+    pub fn insert(&mut self, value: Value) -> bool {
+        if self.index_map.contains_key(&value) {
+            return false;
+        }
+
+        if self.capacity == self.length {
+            // TODO: implement extend capacity
+            return false;
+        }
+
+        let new_index = self.length;
+        self.index_map.insert(value, new_index);
+        self.length += 1;
+
+        let base_length = self.capacity;
+        let mut layer_node = hash_value(&value);
+        let mut layer_index = new_index + base_length - 1;
+        self.node_map.insert(layer_index, layer_node);
+
+        let mut layer = self.capacity.trailing_zeros();
+        while layer > 0 {
+            let is_left_child = layer_index & 1 == 1;
+
+            let (parent_index, new_parent_node) = if is_left_child {
+                let parent_index = (layer_index - 1) >> 1;
+                let sibling = self.node_map.get(&(layer_index + 1)).unwrap();
+                let new_parent_node = hash_two(&layer_node, sibling);
+                (parent_index, new_parent_node)
+            } else {
+                let parent_index = (layer_index - 2) >> 1;
+                let sibling = self.node_map.get(&(layer_index - 1)).unwrap();
+                let new_parent_node = hash_two(sibling, &layer_node);
+                (parent_index, new_parent_node)
+            };
+
+            let node = self.node_map.get_mut(&parent_index).unwrap();
+            *node = new_parent_node;
+
+            layer -= 1;
+            layer_index = parent_index;
+            layer_node = new_parent_node
+        }
+
+        true
+    }
+
+    pub fn new(values: Vec<Value>) -> Self {
+        let values = Self::deduplicate_values_and_keep_order(values);
 
         let capacity = values.len().next_power_of_two();
         let length = values.len();
@@ -86,8 +156,22 @@ impl MerkleTree {
         }
     }
 
-    fn deduplicate_values(values: &mut [Value]) {
-        // TODO: implement
+    fn add_value(&mut self, new_value: Value) {
+        if self.capacity < self.length {
+        } else {
+        }
+    }
+
+    fn deduplicate_values_and_keep_order(values: Vec<Value>) -> Vec<Value> {
+        let mut result = Vec::new();
+        let mut seen = HashSet::new();
+        for value in values.into_iter() {
+            if !seen.contains(&value) {
+                seen.insert(value.clone());
+                result.push(value);
+            }
+        }
+        result
     }
 }
 
@@ -169,6 +253,284 @@ mod tests {
         assert_eq!(tree.capacity, 8);
         assert_eq!(tree.length, 5);
     }
+
+    #[test]
+    fn test_merkle_tree_5() {
+        let values = vec![
+            [11; 32], [12; 32], [12; 32], [13; 32], [14; 32], [15; 32], [15; 32], [13; 32],
+            [13; 32], [15; 32], [11; 32],
+        ];
+        let tree = MerkleTree::new(values);
+        let expected_root = [
+            239, 65, 138, 237, 90, 162, 7, 2, 212, 217, 76, 146, 218, 121, 164, 1, 47, 46, 54, 241,
+            0, 139, 253, 179, 205, 30, 56, 116, 157, 202, 36, 153,
+        ];
+
+        assert_eq!(tree.root(), expected_root);
+        assert_eq!(*tree.index_map.get(&[11; 32]).unwrap(), 0);
+        assert_eq!(*tree.index_map.get(&[12; 32]).unwrap(), 1);
+        assert_eq!(*tree.index_map.get(&[13; 32]).unwrap(), 2);
+        assert_eq!(*tree.index_map.get(&[14; 32]).unwrap(), 3);
+        assert_eq!(*tree.index_map.get(&[15; 32]).unwrap(), 4);
+        assert_eq!(tree.capacity, 8);
+        assert_eq!(tree.length, 5);
+    }
+
+    #[test]
+    fn test_with_capacity_4() {
+        let tree = MerkleTree::with_capacity(4);
+
+        assert_eq!(tree.length, 0);
+        assert!(tree.index_map.is_empty());
+        assert_eq!(tree.node_map.len(), 7);
+        for i in 3..7 {
+            assert_eq!(
+                *tree.node_map.get(&i).unwrap(),
+                default_values::DEFAULT_VALUES[0]
+            )
+        }
+        for i in 1..3 {
+            assert_eq!(
+                *tree.node_map.get(&i).unwrap(),
+                default_values::DEFAULT_VALUES[1]
+            )
+        }
+        assert_eq!(
+            *tree.node_map.get(&0).unwrap(),
+            default_values::DEFAULT_VALUES[2]
+        )
+    }
+
+    #[test]
+    fn test_with_capacity_5() {
+        let tree = MerkleTree::with_capacity(5);
+
+        assert_eq!(tree.length, 0);
+        assert!(tree.index_map.is_empty());
+        assert_eq!(tree.node_map.len(), 15);
+        for i in 7..15 {
+            assert_eq!(
+                *tree.node_map.get(&i).unwrap(),
+                default_values::DEFAULT_VALUES[0]
+            )
+        }
+        for i in 3..7 {
+            assert_eq!(
+                *tree.node_map.get(&i).unwrap(),
+                default_values::DEFAULT_VALUES[1]
+            )
+        }
+        for i in 1..3 {
+            assert_eq!(
+                *tree.node_map.get(&i).unwrap(),
+                default_values::DEFAULT_VALUES[2]
+            )
+        }
+        assert_eq!(
+            *tree.node_map.get(&0).unwrap(),
+            default_values::DEFAULT_VALUES[3]
+        )
+    }
+
+    #[test]
+    fn test_insert_value_1() {
+        let mut tree = MerkleTree::with_capacity(3);
+
+        let values = vec![[1; 32], [2; 32], [3; 32]];
+        let expected_tree = MerkleTree::new(values.clone());
+
+        tree.insert(values[0]);
+        tree.insert(values[1]);
+        tree.insert(values[2]);
+
+        assert_eq!(expected_tree, tree);
+    }
+
+    #[test]
+    fn test_insert_value_2() {
+        let mut tree = MerkleTree::with_capacity(4);
+
+        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32]];
+        let expected_tree = MerkleTree::new(values.clone());
+
+        tree.insert(values[0]);
+        tree.insert(values[1]);
+        tree.insert(values[2]);
+        tree.insert(values[3]);
+
+        assert_eq!(expected_tree, tree);
+    }
+
+    #[test]
+    fn test_insert_value_3() {
+        let mut tree = MerkleTree::with_capacity(5);
+
+        let values = vec![[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
+        let expected_tree = MerkleTree::new(values.clone());
+
+        tree.insert(values[0]);
+        tree.insert(values[1]);
+        tree.insert(values[2]);
+        tree.insert(values[3]);
+        tree.insert(values[4]);
+
+        assert_eq!(expected_tree, tree);
+    }
+
+    #[test]
+    fn test_insert_value_4() {
+        let mut tree = MerkleTree::with_capacity(5);
+
+        let values = vec![[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
+        let expected_tree = MerkleTree::new(values.clone());
+
+        tree.insert(values[0]);
+        tree.insert(values[0]);
+        tree.insert(values[1]);
+        tree.insert(values[1]);
+        tree.insert(values[2]);
+        tree.insert(values[3]);
+        tree.insert(values[2]);
+        tree.insert(values[0]);
+        tree.insert(values[4]);
+        tree.insert(values[2]);
+        tree.insert(values[4]);
+
+        assert_eq!(expected_tree, tree);
+    }
+}
+
+mod default_values {
+    pub(crate) const DEFAULT_VALUES: [[u8; 32]; 32] = [
+        [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+        ],
+        [
+            245, 165, 253, 66, 209, 106, 32, 48, 39, 152, 239, 110, 211, 9, 151, 155, 67, 0, 61,
+            35, 32, 217, 240, 232, 234, 152, 49, 169, 39, 89, 251, 75,
+        ],
+        [
+            219, 86, 17, 78, 0, 253, 212, 193, 248, 92, 137, 43, 243, 90, 201, 168, 146, 137, 170,
+            236, 177, 235, 208, 169, 108, 222, 96, 106, 116, 139, 93, 113,
+        ],
+        [
+            199, 128, 9, 253, 240, 127, 197, 106, 17, 241, 34, 55, 6, 88, 163, 83, 170, 165, 66,
+            237, 99, 228, 76, 75, 193, 95, 244, 205, 16, 90, 179, 60,
+        ],
+        [
+            83, 109, 152, 131, 127, 45, 209, 101, 165, 93, 94, 234, 233, 20, 133, 149, 68, 114,
+            213, 111, 36, 109, 242, 86, 191, 60, 174, 25, 53, 42, 18, 60,
+        ],
+        [
+            158, 253, 224, 82, 170, 21, 66, 159, 174, 5, 186, 212, 208, 177, 215, 198, 77, 166, 77,
+            3, 215, 161, 133, 74, 88, 140, 44, 184, 67, 12, 13, 48,
+        ],
+        [
+            216, 141, 223, 238, 212, 0, 168, 117, 85, 150, 178, 25, 66, 193, 73, 126, 17, 76, 48,
+            46, 97, 24, 41, 15, 145, 230, 119, 41, 118, 4, 31, 161,
+        ],
+        [
+            135, 235, 13, 219, 165, 126, 53, 246, 210, 134, 103, 56, 2, 164, 175, 89, 117, 226, 37,
+            6, 199, 207, 76, 100, 187, 107, 229, 238, 17, 82, 127, 44,
+        ],
+        [
+            38, 132, 100, 118, 253, 95, 197, 74, 93, 67, 56, 81, 103, 201, 81, 68, 242, 100, 63,
+            83, 60, 200, 91, 185, 209, 107, 120, 47, 141, 125, 177, 147,
+        ],
+        [
+            80, 109, 134, 88, 45, 37, 36, 5, 184, 64, 1, 135, 146, 202, 210, 191, 18, 89, 241, 239,
+            90, 165, 248, 135, 225, 60, 178, 240, 9, 79, 81, 225,
+        ],
+        [
+            255, 255, 10, 215, 230, 89, 119, 47, 149, 52, 193, 149, 200, 21, 239, 196, 1, 78, 241,
+            225, 218, 237, 68, 4, 192, 99, 133, 209, 17, 146, 233, 43,
+        ],
+        [
+            108, 240, 65, 39, 219, 5, 68, 28, 216, 51, 16, 122, 82, 190, 133, 40, 104, 137, 14, 67,
+            23, 230, 160, 42, 180, 118, 131, 170, 117, 150, 66, 32,
+        ],
+        [
+            183, 208, 95, 135, 95, 20, 0, 39, 239, 81, 24, 162, 36, 123, 187, 132, 206, 143, 47,
+            15, 17, 35, 98, 48, 133, 218, 247, 150, 12, 50, 159, 95,
+        ],
+        [
+            223, 106, 245, 245, 187, 219, 107, 233, 239, 138, 166, 24, 228, 191, 128, 115, 150, 8,
+            103, 23, 30, 41, 103, 111, 139, 40, 77, 234, 106, 8, 168, 94,
+        ],
+        [
+            181, 141, 144, 15, 94, 24, 46, 60, 80, 239, 116, 150, 158, 161, 108, 119, 38, 197, 73,
+            117, 124, 194, 53, 35, 195, 105, 88, 125, 167, 41, 55, 132,
+        ],
+        [
+            212, 154, 117, 2, 255, 207, 176, 52, 11, 29, 120, 133, 104, 133, 0, 202, 48, 129, 97,
+            167, 249, 107, 98, 223, 157, 8, 59, 113, 252, 200, 242, 187,
+        ],
+        [
+            143, 230, 177, 104, 146, 86, 192, 211, 133, 244, 47, 91, 190, 32, 39, 162, 44, 25, 150,
+            225, 16, 186, 151, 193, 113, 211, 229, 148, 141, 233, 43, 235,
+        ],
+        [
+            141, 13, 99, 195, 158, 186, 222, 133, 9, 224, 174, 60, 156, 56, 118, 251, 95, 161, 18,
+            190, 24, 249, 5, 236, 172, 254, 203, 146, 5, 118, 3, 171,
+        ],
+        [
+            149, 238, 200, 178, 229, 65, 202, 212, 233, 29, 227, 131, 133, 242, 224, 70, 97, 159,
+            84, 73, 108, 35, 130, 203, 108, 172, 213, 185, 140, 38, 245, 164,
+        ],
+        [
+            248, 147, 233, 8, 145, 119, 117, 182, 43, 255, 35, 41, 77, 187, 227, 161, 205, 142,
+            108, 193, 195, 91, 72, 1, 136, 123, 100, 106, 111, 129, 241, 127,
+        ],
+        [
+            205, 219, 167, 181, 146, 227, 19, 51, 147, 193, 97, 148, 250, 199, 67, 26, 191, 47, 84,
+            133, 237, 113, 29, 178, 130, 24, 60, 129, 158, 8, 235, 170,
+        ],
+        [
+            138, 141, 127, 227, 175, 140, 170, 8, 90, 118, 57, 168, 50, 0, 20, 87, 223, 185, 18,
+            138, 128, 97, 20, 42, 208, 51, 86, 41, 255, 35, 255, 156,
+        ],
+        [
+            254, 179, 195, 55, 215, 165, 26, 111, 191, 0, 185, 227, 76, 82, 225, 201, 25, 92, 150,
+            155, 212, 231, 160, 191, 213, 29, 92, 91, 237, 156, 17, 103,
+        ],
+        [
+            231, 31, 10, 168, 60, 195, 46, 223, 190, 250, 159, 77, 62, 1, 116, 202, 133, 24, 46,
+            236, 159, 58, 9, 246, 166, 192, 223, 99, 119, 165, 16, 215,
+        ],
+        [
+            49, 32, 111, 168, 10, 80, 187, 106, 190, 41, 8, 80, 88, 241, 98, 18, 33, 42, 96, 238,
+            200, 240, 73, 254, 203, 146, 216, 200, 224, 168, 75, 192,
+        ],
+        [
+            33, 53, 43, 254, 203, 237, 221, 233, 147, 131, 159, 97, 76, 61, 172, 10, 62, 227, 117,
+            67, 249, 180, 18, 177, 97, 153, 220, 21, 142, 35, 181, 68,
+        ],
+        [
+            97, 158, 49, 39, 36, 187, 109, 124, 49, 83, 237, 157, 231, 145, 215, 100, 163, 102,
+            179, 137, 175, 19, 197, 139, 248, 168, 217, 4, 129, 164, 103, 101,
+        ],
+        [
+            124, 221, 41, 134, 38, 130, 80, 98, 141, 12, 16, 227, 133, 197, 140, 97, 145, 230, 251,
+            224, 81, 145, 188, 192, 79, 19, 63, 44, 234, 114, 193, 196,
+        ],
+        [
+            132, 137, 48, 189, 123, 168, 202, 197, 70, 97, 7, 33, 19, 251, 39, 136, 105, 224, 123,
+            184, 88, 127, 145, 57, 41, 51, 55, 77, 1, 123, 203, 225,
+        ],
+        [
+            136, 105, 255, 44, 34, 178, 140, 193, 5, 16, 217, 133, 50, 146, 128, 51, 40, 190, 79,
+            176, 232, 4, 149, 232, 187, 141, 39, 31, 91, 136, 150, 54,
+        ],
+        [
+            181, 254, 40, 231, 159, 27, 133, 15, 134, 88, 36, 108, 233, 182, 161, 231, 180, 159,
+            192, 109, 183, 20, 62, 143, 224, 180, 242, 176, 197, 82, 58, 92,
+        ],
+        [
+            152, 94, 146, 159, 112, 175, 40, 208, 189, 209, 169, 10, 128, 143, 151, 127, 89, 124,
+            124, 119, 140, 72, 158, 152, 211, 189, 137, 16, 211, 26, 192, 247,
+        ],
+    ];
 }
 
 //
