@@ -348,6 +348,26 @@ mod tests {
         assert_eq!(tree.root(), expected_root);
     }
 
+
+    #[test]
+    fn test_with_capacity_8() {
+        let mut tree = MerkleTree::with_capacity(1);
+
+        let values = vec![[1; 32], [2; 32], [3; 32]];
+
+        let expected_root = [
+            200, 211, 216, 210, 177, 63, 39, 206, 236, 205, 198, 153, 17, 152, 113, 249, 243, 46,
+            167, 237, 134, 255, 69, 208, 173, 17, 247, 123, 40, 205, 117, 104,
+        ];
+
+        tree.insert(values[0]);
+        tree.insert(values[1]);
+        tree.insert(values[2]);
+
+        assert_eq!(tree.root(), expected_root);
+    }
+
+
     #[test]
     fn test_insert_value_1() {
         let mut tree = MerkleTree::with_capacity(1);
