@@ -105,7 +105,10 @@ mod tests {
         merkle_tree::MerkleTree,
         privacy_preserving_transaction::circuit::{Proof, execute_and_prove},
         program::Program,
-        state::CommitmentSet,
+        state::{
+            CommitmentSet,
+            tests::{test_private_account_keys_1, test_private_account_keys_2},
+        },
     };
 
     use rand::{Rng, RngCore, rngs::OsRng};
@@ -163,7 +166,7 @@ mod tests {
 
     #[test]
     fn prove_privacy_preserving_execution_circuit_fully_private() {
-        let sender = AccountWithMetadata {
+        let sender_pre = AccountWithMetadata {
             account: Account {
                 balance: 100,
                 nonce: 0xdeadbeef,
@@ -171,18 +174,16 @@ mod tests {
             },
             is_authorized: true,
         };
-        let private_key_1 = [1; 32];
-        let Npk1 = NullifierPublicKey::from(&private_key_1);
-        let commitment_sender = Commitment::new(&Npk1, &sender.account);
+        let sender_keys = test_private_account_keys_1();
+        let recipient_keys = test_private_account_keys_2();
+        let commitment_sender = Commitment::new(&sender_keys.npk(), &sender_pre.account);
         let recipient = AccountWithMetadata {
             account: Account::default(),
             is_authorized: false,
         };
-        let Npk2 = NullifierPublicKey::from(&[99; 32]);
         let balance_to_move: u128 = 37;
-        let commitment_set =
-            CommitmentSet(MerkleTree::new(vec![commitment_sender.to_byte_array()]));
 
+        let commitment_set = CommitmentSet(MerkleTree::new(&[commitment_sender.to_byte_array()]));
         let program = Program::authenticated_transfer_program();
 
         let expected_private_account_1 = Account {
@@ -198,22 +199,22 @@ mod tests {
             ..Default::default()
         };
         let expected_new_commitments = vec![
-            Commitment::new(&Npk1, &expected_private_account_1),
-            Commitment::new(&Npk2, &expected_private_account_2),
+            Commitment::new(&sender_keys.npk(), &expected_private_account_1),
+            Commitment::new(&recipient_keys.npk(), &expected_private_account_2),
         ];
-        let expected_new_nullifiers = vec![Nullifier::new(&commitment_sender, &private_key_1)];
+        let expected_new_nullifiers = vec![Nullifier::new(&commitment_sender, &sender_keys.nsk)];
 
         let (output, proof) = execute_and_prove(
-            &[sender.clone(), recipient],
+            &[sender_pre.clone(), recipient],
             &Program::serialize_instruction(balance_to_move).unwrap(),
             &[1, 2],
             &[0xdeadbeef1, 0xdeadbeef2],
             &[
-                (Npk1.clone(), [2; 32], [3; 32]),
-                (Npk2.clone(), [4; 32], [5; 32]),
+                (sender_keys.npk(), sender_keys.ivk, [3; 32]),
+                (recipient_keys.npk(), recipient_keys.ivk, [5; 32]),
             ],
             &[(
-                private_key_1,
+                sender_keys.nsk,
                 commitment_set.get_proof_for(&commitment_sender).unwrap(),
             )],
             &program,

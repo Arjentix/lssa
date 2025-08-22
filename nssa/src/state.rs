@@ -22,7 +22,7 @@ impl CommitmentSet {
             .get_authentication_path_for(&commitment.to_byte_array())
     }
 
-    fn extend(&mut self, commitments: &[Commitment]) {
+    pub(crate) fn extend(&mut self, commitments: &[Commitment]) {
         for commitment in commitments {
             self.0.insert(commitment.to_byte_array());
         }
@@ -693,12 +693,12 @@ pub mod tests {
         assert!(matches!(result, Err(NssaError::InvalidProgramBehavior)));
     }
 
-    struct TestPublicKeys {
-        signing_key: PrivateKey,
+    pub struct TestPublicKeys {
+        pub signing_key: PrivateKey,
     }
 
     impl TestPublicKeys {
-        fn address(&self) -> Address {
+        pub fn address(&self) -> Address {
             Address::from(&PublicKey::new_from_private_key(&self.signing_key))
         }
     }
@@ -709,25 +709,25 @@ pub mod tests {
         }
     }
 
-    struct TestPrivateKeys {
-        nsk: NullifierSecretKey,
-        ivk: IncomingViewingPublicKey,
+    pub struct TestPrivateKeys {
+        pub nsk: NullifierSecretKey,
+        pub ivk: IncomingViewingPublicKey,
     }
 
     impl TestPrivateKeys {
-        fn npk(&self) -> NullifierPublicKey {
+        pub fn npk(&self) -> NullifierPublicKey {
             NullifierPublicKey::from(&self.nsk)
         }
     }
 
-    fn test_private_account_keys_1() -> TestPrivateKeys {
+    pub fn test_private_account_keys_1() -> TestPrivateKeys {
         TestPrivateKeys {
             nsk: [13; 32],
             ivk: [31; 32],
         }
     }
 
-    fn test_private_account_keys_2() -> TestPrivateKeys {
+    pub fn test_private_account_keys_2() -> TestPrivateKeys {
         TestPrivateKeys {
             nsk: [38; 32],
             ivk: [83; 32],

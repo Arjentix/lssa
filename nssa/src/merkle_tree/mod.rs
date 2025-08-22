@@ -124,13 +124,13 @@ impl MerkleTree {
         true
     }
 
-    pub fn new(values: Vec<Value>) -> Self {
-        let mut deduplicated_values = Vec::with_capacity(values.len());
+    pub fn new(values: &[Value]) -> Self {
+        let mut deduplicated_values: Vec<Value> = Vec::with_capacity(values.len());
         let mut seen = HashSet::new();
         for value in values.into_iter() {
-            if !seen.contains(&value) {
-                deduplicated_values.push(value);
-                seen.insert(value);
+            if !seen.contains(value) {
+                deduplicated_values.push(*value);
+                seen.insert(*value);
             }
         }
         let mut this = Self::with_capacity(deduplicated_values.len());
@@ -191,8 +191,8 @@ mod tests {
 
     #[test]
     fn test_merkle_tree_1() {
-        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32]];
-        let tree = MerkleTree::new(values.clone());
+        let values = [[1; 32], [2; 32], [3; 32], [4; 32]];
+        let tree = MerkleTree::new(&values);
         let expected_root = [
             72, 199, 63, 120, 33, 165, 138, 141, 42, 112, 62, 91, 57, 197, 113, 192, 170, 32, 207,
             20, 171, 205, 10, 248, 242, 185, 85, 188, 32, 41, 152, 222,
@@ -208,8 +208,8 @@ mod tests {
 
     #[test]
     fn test_merkle_tree_2() {
-        let values = vec![[1; 32], [2; 32], [3; 32], [0; 32]];
-        let tree = MerkleTree::new(values.clone());
+        let values = [[1; 32], [2; 32], [3; 32], [0; 32]];
+        let tree = MerkleTree::new(&values);
         let expected_root = [
             201, 187, 184, 48, 150, 223, 133, 21, 122, 20, 110, 125, 119, 4, 85, 169, 132, 18, 222,
             224, 99, 49, 135, 238, 134, 254, 230, 200, 164, 91, 131, 26,
@@ -225,8 +225,8 @@ mod tests {
 
     #[test]
     fn test_merkle_tree_3() {
-        let values = vec![[1; 32], [2; 32], [3; 32]];
-        let tree = MerkleTree::new(values.clone());
+        let values = [[1; 32], [2; 32], [3; 32]];
+        let tree = MerkleTree::new(&values);
         let expected_root = [
             200, 211, 216, 210, 177, 63, 39, 206, 236, 205, 198, 153, 17, 152, 113, 249, 243, 46,
             167, 237, 134, 255, 69, 208, 173, 17, 247, 123, 40, 205, 117, 104,
@@ -242,8 +242,8 @@ mod tests {
 
     #[test]
     fn test_merkle_tree_4() {
-        let values = vec![[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
-        let tree = MerkleTree::new(values.clone());
+        let values = [[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
+        let tree = MerkleTree::new(&values);
         let expected_root = [
             239, 65, 138, 237, 90, 162, 7, 2, 212, 217, 76, 146, 218, 121, 164, 1, 47, 46, 54, 241,
             0, 139, 253, 179, 205, 30, 56, 116, 157, 202, 36, 153,
@@ -260,11 +260,11 @@ mod tests {
 
     #[test]
     fn test_merkle_tree_5() {
-        let values = vec![
+        let values = [
             [11; 32], [12; 32], [12; 32], [13; 32], [14; 32], [15; 32], [15; 32], [13; 32],
             [13; 32], [15; 32], [11; 32],
         ];
-        let tree = MerkleTree::new(values);
+        let tree = MerkleTree::new(&values);
         let expected_root = [
             239, 65, 138, 237, 90, 162, 7, 2, 212, 217, 76, 146, 218, 121, 164, 1, 47, 46, 54, 241,
             0, 139, 253, 179, 205, 30, 56, 116, 157, 202, 36, 153,
@@ -281,8 +281,8 @@ mod tests {
 
     #[test]
     fn test_merkle_tree_6() {
-        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
-        let tree = MerkleTree::new(values);
+        let values = [[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
+        let tree = MerkleTree::new(&values);
         let expected_root = [
             6, 156, 184, 37, 154, 6, 254, 110, 219, 63, 167, 255, 121, 51, 166, 221, 125, 202, 111,
             202, 41, 147, 20, 55, 151, 148, 166, 136, 146, 108, 55, 146,
@@ -328,7 +328,7 @@ mod tests {
     fn test_with_capacity_6() {
         let mut tree = MerkleTree::with_capacity(100);
 
-        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32]];
+        let values = [[1; 32], [2; 32], [3; 32], [4; 32]];
 
         let expected_root = [
             72, 199, 63, 120, 33, 165, 138, 141, 42, 112, 62, 91, 57, 197, 113, 192, 170, 32, 207,
@@ -347,7 +347,7 @@ mod tests {
     fn test_with_capacity_7() {
         let mut tree = MerkleTree::with_capacity(599);
 
-        let values = vec![[1; 32], [2; 32], [3; 32]];
+        let values = [[1; 32], [2; 32], [3; 32]];
 
         let expected_root = [
             200, 211, 216, 210, 177, 63, 39, 206, 236, 205, 198, 153, 17, 152, 113, 249, 243, 46,
@@ -365,7 +365,7 @@ mod tests {
     fn test_with_capacity_8() {
         let mut tree = MerkleTree::with_capacity(1);
 
-        let values = vec![[1; 32], [2; 32], [3; 32]];
+        let values = [[1; 32], [2; 32], [3; 32]];
 
         let expected_root = [
             200, 211, 216, 210, 177, 63, 39, 206, 236, 205, 198, 153, 17, 152, 113, 249, 243, 46,
@@ -383,8 +383,8 @@ mod tests {
     fn test_insert_value_1() {
         let mut tree = MerkleTree::with_capacity(1);
 
-        let values = vec![[1; 32], [2; 32], [3; 32]];
-        let expected_tree = MerkleTree::new(values.clone());
+        let values = [[1; 32], [2; 32], [3; 32]];
+        let expected_tree = MerkleTree::new(&values);
 
         tree.insert(values[0]);
         tree.insert(values[1]);
@@ -397,8 +397,8 @@ mod tests {
     fn test_insert_value_2() {
         let mut tree = MerkleTree::with_capacity(1);
 
-        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32]];
-        let expected_tree = MerkleTree::new(values.clone());
+        let values = [[1; 32], [2; 32], [3; 32], [4; 32]];
+        let expected_tree = MerkleTree::new(&values);
 
         tree.insert(values[0]);
         tree.insert(values[1]);
@@ -412,8 +412,8 @@ mod tests {
     fn test_insert_value_3() {
         let mut tree = MerkleTree::with_capacity(1);
 
-        let values = vec![[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
-        let expected_tree = MerkleTree::new(values.clone());
+        let values = [[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
+        let expected_tree = MerkleTree::new(&values);
 
         tree.insert(values[0]);
         tree.insert(values[1]);
@@ -428,8 +428,8 @@ mod tests {
     fn test_insert_value_4() {
         let mut tree = MerkleTree::with_capacity(1);
 
-        let values = vec![[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
-        let expected_tree = MerkleTree::new(values.clone());
+        let values = [[11; 32], [12; 32], [13; 32], [14; 32], [15; 32]];
+        let expected_tree = MerkleTree::new(&values);
 
         tree.insert(values[0]);
         tree.insert(values[0]);
@@ -448,8 +448,8 @@ mod tests {
 
     #[test]
     fn test_authentication_path_1() {
-        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32]];
-        let tree = MerkleTree::new(values);
+        let values = [[1; 32], [2; 32], [3; 32], [4; 32]];
+        let tree = MerkleTree::new(&values);
         let expected_authentication_path = (
             2,
             vec![
@@ -470,8 +470,8 @@ mod tests {
 
     #[test]
     fn test_authentication_path_2() {
-        let values = vec![[1; 32], [2; 32], [3; 32]];
-        let tree = MerkleTree::new(values);
+        let values = [[1; 32], [2; 32], [3; 32]];
+        let tree = MerkleTree::new(&values);
         let expected_authentication_path = (
             0,
             vec![
@@ -492,8 +492,8 @@ mod tests {
 
     #[test]
     fn test_authentication_path_3() {
-        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
-        let tree = MerkleTree::new(values);
+        let values = [[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
+        let tree = MerkleTree::new(&values);
         let expected_authentication_path = (
             4,
             vec![
@@ -518,8 +518,8 @@ mod tests {
 
     #[test]
     fn test_authentication_path_4() {
-        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
-        let tree = MerkleTree::new(values);
+        let values = [[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
+        let tree = MerkleTree::new(&values);
         let value = [6; 32];
         assert!(tree.get_authentication_path_for(&value).is_none());
     }
@@ -527,15 +527,15 @@ mod tests {
     #[test]
     fn test_authentication_path_5() {
         let values = vec![[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
-        let tree = MerkleTree::new(values);
+        let tree = MerkleTree::new(&values);
         let value = [0; 32];
         assert!(tree.get_authentication_path_for(&value).is_none());
     }
 
     #[test]
     fn test_authentication_path_6() {
-        let values = vec![[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
-        let tree = MerkleTree::new(values);
+        let values = [[1; 32], [2; 32], [3; 32], [4; 32], [5; 32]];
+        let tree = MerkleTree::new(&values);
         let value = [5; 32];
         let (index, path) = tree.get_authentication_path_for(&value).unwrap();
         assert!(verify_authentication_path(
