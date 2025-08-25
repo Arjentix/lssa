@@ -10,26 +10,39 @@ use nssa_core::{
 };
 use std::collections::{HashMap, HashSet};
 
-pub(crate) struct CommitmentSet(pub(crate) MerkleTree);
+pub(crate) struct CommitmentSet {
+    merkle_tree: MerkleTree,
+    commitments: HashMap<Commitment, usize>,
+}
 
 impl CommitmentSet {
     pub(crate) fn digest(&self) -> CommitmentSetDigest {
-        self.0.root()
+        self.merkle_tree.root()
     }
 
     pub(crate) fn get_proof_for(&self, commitment: &Commitment) -> Option<MembershipProof> {
-        self.0
-            .get_authentication_path_for(&commitment.to_byte_array())
+        let index = *self.commitments.get(commitment)?;
+        self.merkle_tree
+            .get_authentication_path_for(index)
+            .map(|path| (index, path))
     }
 
     pub(crate) fn extend(&mut self, commitments: &[Commitment]) {
-        for commitment in commitments {
-            self.0.insert(commitment.to_byte_array());
+        for commitment in commitments.iter().cloned() {
+            let index = self.merkle_tree.insert(commitment.to_byte_array());
+            self.commitments.insert(commitment, index);
         }
     }
 
     fn contains(&self, commitment: &Commitment) -> bool {
-        self.0.contains(&commitment.to_byte_array())
+        self.commitments.contains_key(commitment)
+    }
+
+    pub(crate) fn with_capacity(capacity: usize) -> CommitmentSet {
+        Self {
+            merkle_tree: MerkleTree::with_capacity(capacity),
+            commitments: HashMap::new(),
+        }
     }
 }
 
@@ -59,10 +72,7 @@ impl V01State {
 
         let mut this = Self {
             public_state,
-            private_state: (
-                CommitmentSet(MerkleTree::with_capacity(32)),
-                NullifierSet::new(),
-            ),
+            private_state: (CommitmentSet::with_capacity(32), NullifierSet::new()),
             builtin_programs: HashMap::new(),
         };
 

@@ -192,13 +192,15 @@ mod tests {
         let sender_keys = test_private_account_keys_1();
         let recipient_keys = test_private_account_keys_2();
         let commitment_sender = Commitment::new(&sender_keys.npk(), &sender_pre.account);
+
         let recipient = AccountWithMetadata {
             account: Account::default(),
             is_authorized: false,
         };
         let balance_to_move: u128 = 37;
 
-        let commitment_set = CommitmentSet(MerkleTree::new(&[commitment_sender.to_byte_array()]));
+        let expected_new_nullifiers = vec![Nullifier::new(&commitment_sender, &sender_keys.nsk)];
+
         let program = Program::authenticated_transfer_program();
 
         let expected_private_account_1 = Account {
@@ -217,7 +219,9 @@ mod tests {
             Commitment::new(&sender_keys.npk(), &expected_private_account_1),
             Commitment::new(&recipient_keys.npk(), &expected_private_account_2),
         ];
-        let expected_new_nullifiers = vec![Nullifier::new(&commitment_sender, &sender_keys.nsk)];
+
+        let mut commitment_set = CommitmentSet::with_capacity(2);
+        commitment_set.extend(&[commitment_sender.clone()]);
 
         let (output, proof) = execute_and_prove(
             &[sender_pre.clone(), recipient],
