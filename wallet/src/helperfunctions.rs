@@ -63,3 +63,19 @@ pub fn produce_data_for_storage(user_data: &NSSAUserData) -> Vec<InitialAccountD
 
     vec_for_storage
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_home_get_env_var() {
+        std::env::set_var(HOME_DIR_ENV_VAR, "/path/to/configs");
+
+        let home = get_home().unwrap();
+
+        assert_eq!(PathBuf::from_str("/path/to/configs").unwrap(), home);
+
+        std::env::remove_var(HOME_DIR_ENV_VAR);
+    }
+}
