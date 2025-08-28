@@ -1,11 +1,12 @@
 use risc0_zkvm::{guest::env, serde::to_vec};
 
 use nssa_core::{
-    account::{Account, AccountWithMetadata, Commitment, Nullifier, NullifierPublicKey},
-    compute_root_associated_to_path,
+    account::{Account, AccountWithMetadata},
+    compute_digest_for_path,
+    encryption::Ciphertext,
     program::{validate_execution, ProgramOutput, DEFAULT_PROGRAM_ID},
-    CommitmentSetDigest, EncryptedAccountData, EphemeralPublicKey, EphemeralSecretKey,
-    IncomingViewingPublicKey, PrivacyPreservingCircuitInput, PrivacyPreservingCircuitOutput,
+    Commitment, CommitmentSetDigest, EncryptionScheme, Nullifier, NullifierPublicKey,
+    PrivacyPreservingCircuitInput, PrivacyPreservingCircuitOutput,
 };
 
 fn main() {
@@ -19,7 +20,7 @@ fn main() {
     } = env::read();
 
     // TODO: Check that `program_execution_proof` is one of the allowed built-in programs
-    // assert!(BUILTIN_PROGRAM_IDS.contains(executing_program_id));
+    // assert_eq!(program_id, AUTHENTICATED_TRANSFER_PROGRAM_ID);
 
     // Check that `program_output` is consistent with the execution of the corresponding program.
     env::verify(program_id, &to_vec(&program_output).unwrap()).unwrap();
@@ -42,7 +43,7 @@ fn main() {
     // and will be populated next.
     let mut public_pre_states: Vec<AccountWithMetadata> = Vec::new();
     let mut public_post_states: Vec<Account> = Vec::new();
-    let mut encrypted_private_post_states: Vec<EncryptedAccountData> = Vec::new();
+    let mut ciphertexts: Vec<Ciphertext> = Vec::new();
     let mut new_commitments: Vec<Commitment> = Vec::new();
     let mut new_nullifiers: Vec<(Nullifier, CommitmentSetDigest)> = Vec::new();
 
@@ -67,23 +68,22 @@ fn main() {
             }
             1 | 2 => {
                 let new_nonce = private_nonces_iter.next().expect("Missing private nonce");
-                let (Npk, Ipk, esk) = private_keys_iter.next().expect("Missing private keys");
+                let (npk, shared_secret) = private_keys_iter.next().expect("Missing keys");
 
                 if visibility_mask[i] == 1 {
                     // Private account with authentication
                     let (nsk, membership_proof) =
                         private_auth_iter.next().expect("Missing private auth");
 
-                    // Verify Npk
-                    let expected_Npk = NullifierPublicKey::from(nsk);
-                    if &expected_Npk != Npk {
-                        panic!("Npk mismatch");
+                    // Verify the nullifier public key
+                    let expected_npk = NullifierPublicKey::from(nsk);
+                    if &expected_npk != npk {
+                        panic!("Nullifier public key mismatch");
                     }
 
                     // Compute commitment set digest associated with provided auth path
-                    let commitment_pre = Commitment::new(Npk, &pre_states[i].account);
-                    let set_digest =
-                        compute_root_associated_to_path(&commitment_pre, membership_proof);
+                    let commitment_pre = Commitment::new(npk, &pre_states[i].account);
+                    let set_digest = compute_digest_for_path(&commitment_pre, membership_proof);
 
                     // Check pre_state authorization
                     if !pre_states[i].is_authorized {
@@ -113,20 +113,18 @@ fn main() {
                 }
 
                 // Compute commitment
-                let commitment_post = Commitment::new(Npk, &post_with_updated_values);
+                let commitment_post = Commitment::new(npk, &post_with_updated_values);
 
                 // Encrypt and push post state
-                let encrypted_account = EncryptedAccountData::new(
+                let encrypted_account = EncryptionScheme::encrypt(
                     &post_with_updated_values,
-                    // &commitment_post,
-                    esk,
-                    Npk,
-                    Ipk,
+                    shared_secret,
+                    &commitment_post,
                     output_index,
                 );
 
                 new_commitments.push(commitment_post);
-                encrypted_private_post_states.push(encrypted_account);
+                ciphertexts.push(encrypted_account);
                 output_index += 1;
             }
             _ => panic!("Invalid visibility mask value"),
@@ -148,7 +146,7 @@ fn main() {
     let output = PrivacyPreservingCircuitOutput {
         public_pre_states,
         public_post_states,
-        encrypted_private_post_states,
+        ciphertexts,
         new_commitments,
         new_nullifiers,
     };

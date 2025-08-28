@@ -1,16 +1,24 @@
 // TODO: Consider switching to deriving Borsh
-
-use risc0_zkvm::sha::{Impl, Sha256};
-
 #[cfg(feature = "host")]
 use std::io::Cursor;
 
 #[cfg(feature = "host")]
 use std::io::Read;
 
-use crate::account::{Account, Commitment, Nullifier, NullifierPublicKey};
+use crate::account::Account;
+
+#[cfg(feature = "host")]
+use crate::encryption::shared_key_derivation::Secp256k1Point;
+
+use crate::encryption::Ciphertext;
+
 #[cfg(feature = "host")]
 use crate::error::NssaCoreError;
+
+use crate::Commitment;
+#[cfg(feature = "host")]
+use crate::Nullifier;
+use crate::NullifierPublicKey;
 
 impl Account {
     pub fn to_bytes(&self) -> Vec<u8> {
@@ -93,6 +101,42 @@ impl Nullifier {
     }
 }
 
+impl Ciphertext {
+    pub fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        let ciphertext_length: u32 = self.0.len() as u32;
+        bytes.extend_from_slice(&ciphertext_length.to_le_bytes());
+        bytes.extend_from_slice(&self.0);
+
+        bytes
+    }
+
+    #[cfg(feature = "host")]
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
+        let mut u32_bytes = [0; 4];
+
+        cursor.read_exact(&mut u32_bytes)?;
+        let ciphertext_lenght = u32::from_le_bytes(u32_bytes);
+        let mut ciphertext = vec![0; ciphertext_lenght as usize];
+        cursor.read_exact(&mut ciphertext)?;
+
+        Ok(Self(ciphertext))
+    }
+}
+
+#[cfg(feature = "host")]
+impl Secp256k1Point {
+    pub fn to_bytes(&self) -> [u8; 33] {
+        self.0.clone().try_into().unwrap()
+    }
+
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
+        let mut value = vec![0; 33];
+        cursor.read_exact(&mut value)?;
+        Ok(Self(value))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -106,7 +150,7 @@ mod tests {
             data: b"hola mundo".to_vec(),
         };
 
-        // program owner || balance || nonce || hash(data)
+        // program owner || balance || nonce || data_len || data
         let expected_bytes = [
             1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 6, 0, 0, 0, 7, 0, 0, 0, 8,
             0, 0, 0, 192, 186, 220, 114, 113, 65, 236, 234, 222, 15, 215, 191, 227, 198, 23, 0, 42,
@@ -127,6 +171,7 @@ mod tests {
         assert_eq!(expected_bytes, bytes);
     }
 
+    #[cfg(feature = "host")]
     #[test]
     fn test_nullifier_to_bytes() {
         let nullifier = Nullifier((0..32).collect::<Vec<u8>>().try_into().unwrap());

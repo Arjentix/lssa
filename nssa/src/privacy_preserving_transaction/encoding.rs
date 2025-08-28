@@ -1,18 +1,43 @@
-// TODO: Consider switching to deriving Borsh
-
 use std::io::{Cursor, Read};
 
 use nssa_core::{
-    EncryptedAccountData,
-    account::{Account, Commitment, Nullifier},
+    Commitment, Nullifier,
+    account::Account,
+    encryption::{Ciphertext, EphemeralPublicKey},
 };
 
-use crate::{Address, error::NssaError};
+use crate::{
+    Address, error::NssaError, privacy_preserving_transaction::message::EncryptedAccountData,
+};
 
 use super::message::Message;
 
 const MESSAGE_ENCODING_PREFIX_LEN: usize = 22;
 const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] = b"\x01/NSSA/v0.1/TxMessage/";
+
+impl EncryptedAccountData {
+    pub(crate) fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = self.ciphertext.to_bytes();
+        bytes.extend_from_slice(&self.epk.to_bytes());
+        bytes.push(self.view_tag);
+        bytes
+    }
+
+    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
+        let ciphertext = Ciphertext::from_cursor(cursor)?;
+        let epk = EphemeralPublicKey::from_cursor(cursor)?;
+
+        let mut tag_bytes = [0; 1];
+        cursor.read_exact(&mut tag_bytes)?;
+        let view_tag = tag_bytes[0];
+
+        Ok(Self {
+            ciphertext,
+            epk,
+            view_tag,
+        })
+    }
+}
 
 impl Message {
     pub(crate) fn to_bytes(&self) -> Vec<u8> {
@@ -63,6 +88,7 @@ impl Message {
         bytes
     }
 
+    #[allow(unused)]
     pub(crate) fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
         let prefix = {
             let mut this = [0u8; MESSAGE_ENCODING_PREFIX_LEN];
@@ -90,7 +116,7 @@ impl Message {
         // Nonces
         cursor.read_exact(&mut len_bytes)?;
         let nonces_len = u32::from_le_bytes(len_bytes) as usize;
-        let mut nonces = Vec::with_capacity(nonces_len as usize);
+        let mut nonces = Vec::with_capacity(nonces_len);
         for _ in 0..nonces_len {
             let mut buf = [0u8; 16];
             cursor.read_exact(&mut buf)?;
@@ -128,7 +154,7 @@ impl Message {
         for _ in 0..new_nullifiers_len {
             let nullifier = Nullifier::from_cursor(cursor)?;
             let mut commitment_set_digest = [0; 32];
-            cursor.read_exact(&mut commitment_set_digest);
+            cursor.read_exact(&mut commitment_set_digest)?;
             new_nullifiers.push((nullifier, commitment_set_digest));
         }
 
