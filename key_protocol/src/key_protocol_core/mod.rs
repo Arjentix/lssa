@@ -1,14 +1,9 @@
 use std::collections::HashMap;
 
-use anyhow::Result;
 use k256::AffinePoint;
 use serde::{Deserialize, Serialize};
 
-use crate::key_management::{
-    constants_types::{CipherText, Nonce},
-    ephemeral_key_holder::EphemeralKeyHolder,
-    KeyChain,
-};
+use crate::key_management::KeyChain;
 
 pub type PublicKey = AffinePoint;
 
@@ -16,33 +11,6 @@ pub type PublicKey = AffinePoint;
 pub struct NSSAUserData {
     pub key_holder: KeyChain,
     pub accounts: HashMap<nssa::Address, nssa_core::account::Account>,
-}
-
-///A strucure, which represents all the visible(public) information
-///
-/// known to each node about account `address`
-///
-/// Main usage is to encode data for other account
-#[derive(Serialize, Clone)]
-pub struct NSSAUserDataPublicMask {
-    pub nullifier_public_key: AffinePoint,
-    pub viewing_public_key: AffinePoint,
-}
-
-impl NSSAUserDataPublicMask {
-    pub fn encrypt_data(
-        ephemeral_key_holder: &EphemeralKeyHolder,
-        viewing_public_key_receiver: AffinePoint,
-        data: &[u8],
-    ) -> (CipherText, Nonce) {
-        //Using of parent NSSAUserData fuction
-        NSSAUserData::encrypt_data(ephemeral_key_holder, viewing_public_key_receiver, data)
-    }
-
-    //ToDo: Part of a private keys update
-    // pub fn make_tag(&self) -> Tag {
-    //     self.address.value()[0]
-    // }
 }
 
 impl NSSAUserData {
@@ -90,24 +58,6 @@ impl NSSAUserData {
         self.key_holder.get_pub_account_signing_key(address)
     }
 
-    pub fn encrypt_data(
-        ephemeral_key_holder: &EphemeralKeyHolder,
-        viewing_public_key_receiver: AffinePoint,
-        data: &[u8],
-    ) -> (CipherText, Nonce) {
-        ephemeral_key_holder.encrypt_data(viewing_public_key_receiver, data)
-    }
-
-    pub fn decrypt_data(
-        &self,
-        ephemeral_public_key_sender: AffinePoint,
-        ciphertext: CipherText,
-        nonce: Nonce,
-    ) -> Result<Vec<u8>, aes_gcm::Error> {
-        self.key_holder
-            .decrypt_data(ephemeral_public_key_sender, ciphertext, nonce)
-    }
-
     pub fn update_account_balance(&mut self, address: nssa::Address, new_balance: u128) {
         self.accounts
             .entry(address)
@@ -119,14 +69,6 @@ impl NSSAUserData {
     // pub fn make_tag(&self) -> Tag {
     //     self.address.value()[0]
     // }
-
-    ///Produce account public mask
-    pub fn make_account_public_mask(&self) -> NSSAUserDataPublicMask {
-        NSSAUserDataPublicMask {
-            nullifier_public_key: self.key_holder.nullifer_public_key,
-            viewing_public_key: self.key_holder.viewing_public_key,
-        }
-    }
 }
 
 impl Default for NSSAUserData {
