@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use anyhow::Result;
 use k256::AffinePoint;
 use serde::{Deserialize, Serialize};
 
@@ -23,16 +24,32 @@ impl NSSAUserData {
         }
     }
 
+    fn valid_key_transaction_pairing_check(
+        accounts_keys_map: &HashMap<nssa::Address, nssa::PrivateKey>,
+    ) -> bool {
+        let mut check_res = true;
+        for (addr, key) in accounts_keys_map {
+            if &nssa::Address::from(&nssa::PublicKey::new_from_private_key(&key)) != addr {
+                check_res = false;
+            }
+        }
+        check_res
+    }
+
     pub fn new_with_accounts(
         accounts_keys: HashMap<nssa::Address, nssa::PrivateKey>,
         accounts: HashMap<nssa::Address, nssa_core::account::Account>,
-    ) -> Self {
+    ) -> Result<Self> {
+        if !Self::valid_key_transaction_pairing_check(&accounts_keys) {
+            anyhow::bail!("Key transaction pairing check not satisfied, there is addresses, which is not derived from keys");
+        }
+
         let key_holder = KeyChain::new_os_random_with_accounts(accounts_keys);
 
-        Self {
+        Ok(Self {
             key_holder,
             accounts,
-        }
+        })
     }
 
     pub fn generate_new_account(&mut self) -> nssa::Address {

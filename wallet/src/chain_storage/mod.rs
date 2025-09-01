@@ -31,7 +31,7 @@ impl WalletChainStore {
         let utxo_commitments_store = UTXOCommitmentsMerkleTree::new(vec![]);
 
         Ok(Self {
-            user_data: NSSAUserData::new_with_accounts(accounts_keys, accounts),
+            user_data: NSSAUserData::new_with_accounts(accounts_keys, accounts)?,
             utxo_commitments_store,
             wallet_config: config,
         })
