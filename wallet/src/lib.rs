@@ -12,9 +12,10 @@ use log::info;
 use nssa::Address;
 
 use clap::{Parser, Subcommand};
+use nssa_core::account::Account;
 
 use crate::helperfunctions::{
-    fetch_config, fetch_persistent_accounts, produce_account_addr_from_hex,
+    fetch_config, produce_account_addr_from_hex,
 };
 
 pub const HOME_DIR_ENV_VAR: &str = "NSSA_WALLET_HOME_DIR";
@@ -30,17 +31,10 @@ pub struct WalletCore {
 }
 
 impl WalletCore {
-    pub async fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
+    pub fn start_from_config_update_chain(config: WalletConfig) -> Result<Self> {
         let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
 
-        let mut storage = WalletChainStore::new(config)?;
-
-        let persistent_accounts = fetch_persistent_accounts()?;
-        for acc in persistent_accounts {
-            storage
-                .user_data
-                .update_account_balance(acc.address, acc.account.balance);
-        }
+        let storage = WalletChainStore::new(config)?;
 
         Ok(Self {
             storage,
@@ -48,8 +42,17 @@ impl WalletCore {
         })
     }
 
-    pub async fn create_new_account(&mut self) -> Address {
+    pub fn create_new_account(&mut self) -> Address {
         self.storage.user_data.generate_new_account()
+    }
+
+    pub fn search_for_initial_account(&self, acc_addr: Address) -> Option<Account> {
+        for initial_acc in &self.storage.wallet_config.initial_accounts {
+            if initial_acc.address == acc_addr {
+                return Some(initial_acc.account.clone());
+            }
+        }
+        None
     }
 
     pub async fn send_public_native_token_transfer(
@@ -59,7 +62,7 @@ impl WalletCore {
         to: Address,
         balance_to_move: u128,
     ) -> Result<SendTxResponse, ExecutionFailureKind> {
-        let account = self.storage.user_data.get_account(&from);
+        let account = self.search_for_initial_account(from);
 
         if let Some(account) = account {
             if account.balance >= balance_to_move {
@@ -138,7 +141,7 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
             let from = produce_account_addr_from_hex(from)?;
             let to = produce_account_addr_from_hex(to)?;
 
-            let wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
+            let wallet_core = WalletCore::start_from_config_update_chain(wallet_config)?;
 
             let res = wallet_core
                 .send_public_native_token_transfer(from, nonce, to, amount)

@@ -11,7 +11,6 @@ pub type PublicKey = AffinePoint;
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct NSSAUserData {
     pub key_holder: KeyChain,
-    pub accounts: HashMap<nssa::Address, nssa_core::account::Account>,
 }
 
 impl NSSAUserData {
@@ -20,7 +19,6 @@ impl NSSAUserData {
 
         Self {
             key_holder,
-            accounts: HashMap::new(),
         }
     }
 
@@ -38,7 +36,6 @@ impl NSSAUserData {
 
     pub fn new_with_accounts(
         accounts_keys: HashMap<nssa::Address, nssa::PrivateKey>,
-        accounts: HashMap<nssa::Address, nssa_core::account::Account>,
     ) -> Result<Self> {
         if !Self::valid_key_transaction_pairing_check(&accounts_keys) {
             anyhow::bail!("Key transaction pairing check not satisfied, there is addresses, which is not derived from keys");
@@ -48,44 +45,18 @@ impl NSSAUserData {
 
         Ok(Self {
             key_holder,
-            accounts,
         })
     }
 
     pub fn generate_new_account(&mut self) -> nssa::Address {
         let address = self.key_holder.generate_new_private_key();
-        self.accounts
-            .insert(address, nssa_core::account::Account::default());
 
         address
-    }
-
-    pub fn get_account_balance(&self, address: &nssa::Address) -> u128 {
-        self.accounts
-            .get(address)
-            .map(|acc| acc.balance)
-            .unwrap_or(0)
-    }
-
-    pub fn get_account(&self, address: &nssa::Address) -> Option<&nssa_core::account::Account> {
-        self.accounts.get(address)
     }
 
     pub fn get_account_signing_key(&self, address: &nssa::Address) -> Option<&nssa::PrivateKey> {
         self.key_holder.get_pub_account_signing_key(address)
     }
-
-    pub fn update_account_balance(&mut self, address: nssa::Address, new_balance: u128) {
-        self.accounts
-            .entry(address)
-            .and_modify(|acc| acc.balance = new_balance)
-            .or_default();
-    }
-
-    //ToDo: Part of a private keys update
-    // pub fn make_tag(&self) -> Tag {
-    //     self.address.value()[0]
-    // }
 }
 
 impl Default for NSSAUserData {
@@ -102,29 +73,6 @@ mod tests {
     fn test_new_account() {
         let mut user_data = NSSAUserData::new();
 
-        let addr = user_data.generate_new_account();
-
-        assert_eq!(user_data.get_account_balance(&addr), 0);
+        let _addr = user_data.generate_new_account();
     }
-
-    #[test]
-    fn test_update_balance() {
-        let mut user_data = NSSAUserData::new();
-
-        let address = user_data.generate_new_account();
-
-        user_data.update_account_balance(address, 500);
-
-        assert_eq!(user_data.get_account_balance(&address), 500);
-    }
-
-    //ToDo: Part of a private keys update
-    // #[test]
-    // fn accounts_accounts_mask_tag_consistency() {
-    //     let account = NSSAUserData::new();
-
-    //     let account_mask = account.make_account_public_mask();
-
-    //     assert_eq!(account.make_tag(), account_mask.make_tag());
-    // }
 }
