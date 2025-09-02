@@ -25,7 +25,7 @@ impl NSSAUserData {
     ) -> bool {
         let mut check_res = true;
         for (addr, key) in accounts_keys_map {
-            if &nssa::Address::from(&nssa::PublicKey::new_from_private_key(&key)) != addr {
+            if &nssa::Address::from(&nssa::PublicKey::new_from_private_key(key)) != addr {
                 check_res = false;
             }
         }
@@ -45,9 +45,7 @@ impl NSSAUserData {
     }
 
     pub fn generate_new_account(&mut self) -> nssa::Address {
-        let address = self.key_holder.generate_new_private_key();
-
-        address
+        self.key_holder.generate_new_private_key()
     }
 
     pub fn get_account_signing_key(&self, address: &nssa::Address) -> Option<&nssa::PrivateKey> {
