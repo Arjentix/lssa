@@ -1280,4 +1280,39 @@ pub mod tests {
 
         assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
     }
+
+    #[test]
+    fn test_circuit_fails_if_visibility_masks_have_incorrect_lenght() {
+        let program = Program::simple_balance_transfer();
+        let public_account_1 = AccountWithMetadata {
+            account: Account {
+                program_owner: program.id(),
+                balance: 100,
+                ..Account::default()
+            },
+            is_authorized: true,
+        };
+        let public_account_2 = AccountWithMetadata {
+            account: Account {
+                program_owner: program.id(),
+                balance: 0,
+                ..Account::default()
+            },
+            is_authorized: true,
+        };
+
+        // Setting only one visibility mask for a circuit execution with two pre_state accounts.
+        let visibility_mask = [0];
+        let result = execute_and_prove(
+            &[public_account_1, public_account_2],
+            &Program::serialize_instruction(10u128).unwrap(),
+            &visibility_mask,
+            &[],
+            &[],
+            &[],
+            &program,
+        );
+
+        assert!(matches!(result, Err(NssaError::CircuitProvingError(_))));
+    }
 }
