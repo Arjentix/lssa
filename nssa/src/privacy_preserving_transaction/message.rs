@@ -1,16 +1,45 @@
 use nssa_core::{
-    Commitment, CommitmentSetDigest, Nullifier, PrivacyPreservingCircuitOutput,
+    Commitment, CommitmentSetDigest, Nullifier, NullifierPublicKey, PrivacyPreservingCircuitOutput,
     account::{Account, Nonce},
-    encryption::{Ciphertext, EphemeralPublicKey},
+    encryption::{Ciphertext, EphemeralPublicKey, IncomingViewingPublicKey},
 };
+use sha2::{Digest, Sha256};
 
 use crate::{Address, error::NssaError};
+
+pub type ViewTag = u8;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EncryptedAccountData {
     pub(crate) ciphertext: Ciphertext,
     pub(crate) epk: EphemeralPublicKey,
-    pub(crate) view_tag: u8,
+    pub(crate) view_tag: ViewTag,
+}
+
+impl EncryptedAccountData {
+    fn new(
+        ciphertext: Ciphertext,
+        npk: NullifierPublicKey,
+        ivk: IncomingViewingPublicKey,
+        epk: EphemeralPublicKey,
+    ) -> Self {
+        let view_tag = Self::compute_view_tag(npk, ivk);
+        Self {
+            ciphertext,
+            epk,
+            view_tag,
+        }
+    }
+
+    /// Computes the tag as the first byte of SHA256("/NSSA/v0.1/ViewTag" || Npk || Ivk)
+    pub fn compute_view_tag(npk: NullifierPublicKey, ivk: IncomingViewingPublicKey) -> ViewTag {
+        let mut hasher = Sha256::new();
+        hasher.update(b"/NSSA/v0.1/ViewTag");
+        hasher.update(npk.to_byte_array());
+        hasher.update(ivk.to_bytes());
+        let digest: [u8; 32] = hasher.finalize().into();
+        digest[0]
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -27,10 +56,14 @@ impl Message {
     pub fn try_from_circuit_output(
         public_addresses: Vec<Address>,
         nonces: Vec<Nonce>,
-        ephemeral_public_keys: Vec<EphemeralPublicKey>,
+        public_keys: Vec<(
+            NullifierPublicKey,
+            IncomingViewingPublicKey,
+            EphemeralPublicKey,
+        )>,
         output: PrivacyPreservingCircuitOutput,
     ) -> Result<Self, NssaError> {
-        if ephemeral_public_keys.len() != output.ciphertexts.len() {
+        if public_keys.len() != output.ciphertexts.len() {
             return Err(NssaError::InvalidInput(
                 "Ephemeral public keys and ciphertexts length mismatch".into(),
             ));
@@ -39,11 +72,9 @@ impl Message {
         let encrypted_private_post_states = output
             .ciphertexts
             .into_iter()
-            .zip(ephemeral_public_keys)
-            .map(|(ciphertext, epk)| EncryptedAccountData {
-                ciphertext,
-                epk,
-                view_tag: 0, // TODO: implement
+            .zip(public_keys)
+            .map(|(ciphertext, (npk, ivk, epk))| {
+                EncryptedAccountData::new(ciphertext, npk, ivk, epk)
             })
             .collect();
         Ok(Self {
@@ -61,9 +92,17 @@ impl Message {
 pub mod tests {
     use std::io::Cursor;
 
-    use nssa_core::{Commitment, Nullifier, NullifierPublicKey, account::Account};
+    use nssa_core::{
+        Commitment, EncryptionScheme, Nullifier, NullifierPublicKey, SharedSecretKey,
+        account::Account,
+        encryption::{EphemeralPublicKey, IncomingViewingPublicKey},
+    };
+    use sha2::{Digest, Sha256};
 
-    use crate::{Address, privacy_preserving_transaction::message::Message};
+    use crate::{
+        Address,
+        privacy_preserving_transaction::message::{EncryptedAccountData, Message},
+    };
 
     pub fn message_for_tests() -> Message {
         let account1 = Account::default();
@@ -107,5 +146,36 @@ pub mod tests {
         let message_from_cursor = Message::from_cursor(&mut cursor).unwrap();
 
         assert_eq!(message, message_from_cursor);
+    }
+
+    #[test]
+    fn test_encrypted_account_data_constructor() {
+        let npk = NullifierPublicKey::from(&[1; 32]);
+        let ivk = IncomingViewingPublicKey::from(&[2; 32]);
+        let account = Account::default();
+        let commitment = Commitment::new(&npk, &account);
+        let esk = [3; 32];
+        let shared_secret = SharedSecretKey::new(&esk, &ivk);
+        let epk = EphemeralPublicKey::from_scalar(esk);
+        let ciphertext = EncryptionScheme::encrypt(&account, &shared_secret, &commitment, 2);
+        let encrypted_account_data =
+            EncryptedAccountData::new(ciphertext.clone(), npk.clone(), ivk.clone(), epk.clone());
+
+        let expected_view_tag = {
+            let mut hasher = Sha256::new();
+            hasher.update(b"/NSSA/v0.1/ViewTag");
+            hasher.update(npk.to_byte_array());
+            hasher.update(ivk.to_bytes());
+            let digest: [u8; 32] = hasher.finalize().into();
+            digest[0]
+        };
+
+        assert_eq!(encrypted_account_data.ciphertext, ciphertext);
+        assert_eq!(encrypted_account_data.epk, epk);
+        assert_eq!(
+            encrypted_account_data.view_tag,
+            EncryptedAccountData::compute_view_tag(npk, ivk)
+        );
+        assert_eq!(encrypted_account_data.view_tag, expected_view_tag);
     }
 }
