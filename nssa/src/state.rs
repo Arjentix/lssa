@@ -801,7 +801,7 @@ pub mod tests {
         let message = Message::try_from_circuit_output(
             vec![sender_keys.address()],
             vec![sender_nonce],
-            vec![epk],
+            vec![(recipient_keys.npk(), recipient_keys.ivk(), epk)],
             output,
         )
         .unwrap();
@@ -854,8 +854,16 @@ pub mod tests {
         )
         .unwrap();
 
-        let message =
-            Message::try_from_circuit_output(vec![], vec![], vec![epk_1, epk_2], output).unwrap();
+        let message = Message::try_from_circuit_output(
+            vec![],
+            vec![],
+            vec![
+                (sender_keys.npk(), sender_keys.ivk(), epk_1),
+                (recipient_keys.npk(), recipient_keys.ivk(), epk_2),
+            ],
+            output,
+        )
+        .unwrap();
 
         let witness_set = WitnessSet::for_message(&message, proof, &[]);
 
@@ -899,9 +907,13 @@ pub mod tests {
         )
         .unwrap();
 
-        let message =
-            Message::try_from_circuit_output(vec![*recipient_address], vec![], vec![epk], output)
-                .unwrap();
+        let message = Message::try_from_circuit_output(
+            vec![*recipient_address],
+            vec![],
+            vec![(sender_keys.npk(), sender_keys.ivk(), epk)],
+            output,
+        )
+        .unwrap();
 
         let witness_set = WitnessSet::for_message(&message, proof, &[]);
 
