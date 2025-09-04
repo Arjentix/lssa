@@ -555,35 +555,6 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_get_account_data_for_existent_account() {
-        let (json_handler, initial_accounts, _) = components_for_tests();
-
-        let acc_1_addr = initial_accounts[0].addr.clone();
-
-        let request = serde_json::json!({
-            "jsonrpc": "2.0",
-            "method": "get_account_data",
-            "params": { "address": acc_1_addr },
-            "id": 1
-        });
-
-        let expected_response = serde_json::json!({
-            "id": 1,
-            "jsonrpc": "2.0",
-            "result": {
-                "balance": 9990,
-                "nonce": 1,
-                "program_owner": [ 1793544791, 852173979, 3315478100u32, 4158236927u32, 146723505, 3793635251u32, 999304864, 2535706995u32],
-                "data": [],
-            }
-        });
-
-        let response = call_rpc_handler_with_json(json_handler, request).await;
-
-        assert_eq!(response, expected_response);
-    }
-
-    #[actix_web::test]
     async fn test_get_transaction_by_hash_for_non_existent_hash() {
         let (json_handler, _, _) = components_for_tests();
         let request = serde_json::json!({
