@@ -1,29 +1,32 @@
 use std::collections::HashMap;
 
 use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
-use constants_types::{CipherText, Nonce};
+use common::merkle_tree_public::TreeHashType;
+use elliptic_curve::group::GroupEncoding;
 use elliptic_curve::point::AffineCoordinates;
 use k256::AffinePoint;
 use log::info;
-use secret_holders::{SeedHolder, TopSecretKeyHolder, UTXOSecretKeyHolder};
+use secret_holders::{PrivateKeyHolder, SeedHolder, TopSecretKeyHolder};
 use serde::{Deserialize, Serialize};
+use sha2::{digest::FixedOutput, Digest};
+use types::{CipherText, Nonce};
 
 use crate::key_protocol_core::PublicKey;
 pub type PublicAccountSigningKey = [u8; 32];
 
-pub mod constants_types;
 pub mod ephemeral_key_holder;
 pub mod secret_holders;
+pub mod types;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 ///Entrypoint to key management
 pub struct KeyChain {
     top_secret_key_holder: TopSecretKeyHolder,
-    pub utxo_secret_key_holder: UTXOSecretKeyHolder,
+    pub private_key_holder: PrivateKeyHolder,
     ///Map for all users accounts
     pub_account_signing_keys: HashMap<nssa::Address, nssa::PrivateKey>,
-    pub nullifer_public_key: PublicKey,
-    pub viewing_public_key: PublicKey,
+    pub nullifer_public_key: [u8; 32],
+    pub incoming_viewing_public_key: PublicKey,
 }
 
 impl KeyChain {
@@ -33,16 +36,16 @@ impl KeyChain {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
-        let utxo_secret_key_holder = top_secret_key_holder.produce_utxo_secret_holder();
+        let private_key_holder = top_secret_key_holder.produce_private_key_holder();
 
-        let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
-        let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
+        let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
+        let incoming_viewing_public_key = private_key_holder.generate_incoming_viewing_public_key();
 
         Self {
             top_secret_key_holder,
-            utxo_secret_key_holder,
+            private_key_holder,
             nullifer_public_key,
-            viewing_public_key,
+            incoming_viewing_public_key,
             pub_account_signing_keys: HashMap::new(),
         }
     }
@@ -53,18 +56,27 @@ impl KeyChain {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
-        let utxo_secret_key_holder = top_secret_key_holder.produce_utxo_secret_holder();
+        let private_key_holder = top_secret_key_holder.produce_private_key_holder();
 
-        let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
-        let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
+        let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
+        let incoming_viewing_public_key = private_key_holder.generate_incoming_viewing_public_key();
 
         Self {
             top_secret_key_holder,
-            utxo_secret_key_holder,
+            private_key_holder,
             nullifer_public_key,
-            viewing_public_key,
+            incoming_viewing_public_key,
             pub_account_signing_keys: accounts,
         }
+    }
+
+    pub fn produce_user_address(&self) -> [u8; 32] {
+        let mut hasher = sha2::Sha256::new();
+
+        hasher.update(&self.nullifer_public_key);
+        hasher.update(&self.incoming_viewing_public_key.to_bytes());
+
+        <TreeHashType>::from(hasher.finalize_fixed())
     }
 
     pub fn generate_new_private_key(&mut self) -> nssa::Address {
@@ -112,14 +124,18 @@ impl KeyChain {
         );
         info!(
             "Nulifier secret key is {:?}",
+            hex::encode(serde_json::to_vec(&self.private_key_holder.nullifier_secret_key).unwrap()),
+        );
+        info!(
+            "Viewing secret key is {:?}",
             hex::encode(
-                serde_json::to_vec(&self.utxo_secret_key_holder.nullifier_secret_key).unwrap()
+                serde_json::to_vec(&self.private_key_holder.incoming_viewing_secret_key).unwrap()
             ),
         );
         info!(
             "Viewing secret key is {:?}",
             hex::encode(
-                serde_json::to_vec(&self.utxo_secret_key_holder.viewing_secret_key).unwrap()
+                serde_json::to_vec(&self.private_key_holder.outgoing_viewing_secret_key).unwrap()
             ),
         );
         info!(
@@ -128,7 +144,7 @@ impl KeyChain {
         );
         info!(
             "Viewing public key is {:?}",
-            hex::encode(serde_json::to_vec(&self.viewing_public_key).unwrap()),
+            hex::encode(serde_json::to_vec(&self.incoming_viewing_public_key).unwrap()),
         );
     }
 }
@@ -139,12 +155,11 @@ mod tests {
         aead::{Aead, KeyInit, OsRng},
         Aes256Gcm,
     };
-    use constants_types::{CipherText, Nonce};
-    use constants_types::{NULLIFIER_SECRET_CONST, VIEWING_SECRET_CONST};
     use elliptic_curve::ff::Field;
     use elliptic_curve::group::prime::PrimeCurveAffine;
     use elliptic_curve::point::AffineCoordinates;
     use k256::{AffinePoint, ProjectivePoint, Scalar};
+    use types::{CipherText, Nonce};
 
     use crate::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 
@@ -156,11 +171,9 @@ mod tests {
         let address_key_holder = KeyChain::new_os_random();
 
         // Check that key holder fields are initialized with expected types
+        assert_ne!(address_key_holder.nullifer_public_key, [0u8; 32]);
         assert!(!Into::<bool>::into(
-            address_key_holder.nullifer_public_key.is_identity()
-        ));
-        assert!(!Into::<bool>::into(
-            address_key_holder.viewing_public_key.is_identity()
+            address_key_holder.incoming_viewing_public_key.is_identity()
         ));
     }
 
@@ -209,20 +222,6 @@ mod tests {
 
         // Verify decryption is successful and matches original plaintext
         assert_eq!(decrypted_data, plaintext);
-    }
-
-    #[test]
-    fn test_new_os_random_initialization() {
-        // Ensure that KeyChain is initialized correctly
-        let address_key_holder = KeyChain::new_os_random();
-
-        // Check that key holder fields are initialized with expected types and values
-        assert!(!Into::<bool>::into(
-            address_key_holder.nullifer_public_key.is_identity()
-        ));
-        assert!(!Into::<bool>::into(
-            address_key_holder.viewing_public_key.is_identity()
-        ));
     }
 
     #[test]
@@ -359,10 +358,10 @@ mod tests {
         let seed_holder = SeedHolder::new_os_random();
         let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
 
-        let utxo_secret_key_holder = top_secret_key_holder.produce_utxo_secret_holder();
+        let utxo_secret_key_holder = top_secret_key_holder.produce_private_key_holder();
 
         let nullifer_public_key = utxo_secret_key_holder.generate_nullifier_public_key();
-        let viewing_public_key = utxo_secret_key_holder.generate_viewing_public_key();
+        let viewing_public_key = utxo_secret_key_holder.generate_incoming_viewing_public_key();
 
         let pub_account_signing_key = nssa::PrivateKey::new_os_random();
 
@@ -377,11 +376,6 @@ mod tests {
             "Group generator {:?}",
             hex::encode(serde_json::to_vec(&AffinePoint::GENERATOR).unwrap())
         );
-        println!(
-            "Nullifier constant {:?}",
-            hex::encode(*NULLIFIER_SECRET_CONST)
-        );
-        println!("Viewing constatnt {:?}", hex::encode(*VIEWING_SECRET_CONST));
         println!();
 
         println!("======Holders======");

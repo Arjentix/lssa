@@ -5,7 +5,7 @@ use k256::{AffinePoint, FieldBytes, Scalar};
 use log::info;
 use rand::{rngs::OsRng, RngCore};
 
-use super::constants_types::{CipherText, Nonce};
+use super::types::{CipherText, Nonce};
 
 #[derive(Debug)]
 ///Ephemeral secret key holder. Non-clonable as intended for one-time use. Produces ephemeral public keys. Can produce shared secret for sender.
