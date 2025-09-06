@@ -210,7 +210,7 @@ pub enum Command {
         addr: String,
     },
 
-    // TODO: This is for testnet only, consider refactoring to have this not compiled for mainnet
+    // TODO: Testnet only. Refactor to prevent compilation on mainnet.
     // Claim piñata prize
     ClaimPinata {
         ///pinata_addr - valid 32 byte hex string

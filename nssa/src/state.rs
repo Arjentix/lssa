@@ -8,7 +8,6 @@ use nssa_core::{
     account::Account,
     program::{DEFAULT_PROGRAM_ID, ProgramId},
 };
-use rand::{Rng, RngCore, rngs::OsRng};
 use std::collections::{HashMap, HashSet};
 
 pub(crate) struct CommitmentSet {
@@ -207,7 +206,7 @@ impl V01State {
     }
 }
 
-// TODO: This is for testnet only, consider refactoring to have this not compiled for mainnet
+// TODO: Testnet only. Refactor to prevent compilation on mainnet.
 impl V01State {
     pub fn add_pinata_program(&mut self, address: Address) {
         self.insert_program(Program::pinata());

@@ -77,7 +77,7 @@ impl Program {
     }
 }
 
-// TODO: This is for testnet only, consider refactoring to have this not compiled for mainnet
+// TODO: Testnet only. Refactor to prevent compilation on mainnet.
 impl Program {
     pub fn pinata() -> Self {
         Self {
