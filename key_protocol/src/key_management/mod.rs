@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use aes_gcm::{aead::Aead, Aes256Gcm, KeyInit};
 use common::merkle_tree_public::TreeHashType;
 use elliptic_curve::group::GroupEncoding;
@@ -23,8 +21,6 @@ pub mod types;
 pub struct KeyChain {
     top_secret_key_holder: TopSecretKeyHolder,
     pub private_key_holder: PrivateKeyHolder,
-    ///Map for all users accounts
-    pub_account_signing_keys: HashMap<nssa::Address, nssa::PrivateKey>,
     pub nullifer_public_key: [u8; 32],
     pub incoming_viewing_public_key: PublicKey,
 }
@@ -46,61 +42,27 @@ impl KeyChain {
             private_key_holder,
             nullifer_public_key,
             incoming_viewing_public_key,
-            pub_account_signing_keys: HashMap::new(),
-        }
-    }
-
-    pub fn new_os_random_with_accounts(accounts: HashMap<nssa::Address, nssa::PrivateKey>) -> Self {
-        //Currently dropping SeedHolder at the end of initialization.
-        //Now entirely sure if we need it in the future.
-        let seed_holder = SeedHolder::new_os_random();
-        let top_secret_key_holder = seed_holder.produce_top_secret_key_holder();
-
-        let private_key_holder = top_secret_key_holder.produce_private_key_holder();
-
-        let nullifer_public_key = private_key_holder.generate_nullifier_public_key();
-        let incoming_viewing_public_key = private_key_holder.generate_incoming_viewing_public_key();
-
-        Self {
-            top_secret_key_holder,
-            private_key_holder,
-            nullifer_public_key,
-            incoming_viewing_public_key,
-            pub_account_signing_keys: accounts,
         }
     }
 
     pub fn produce_user_address(&self) -> [u8; 32] {
         let mut hasher = sha2::Sha256::new();
 
-        hasher.update(&self.nullifer_public_key);
-        hasher.update(&self.incoming_viewing_public_key.to_bytes());
+        hasher.update(self.nullifer_public_key);
+        hasher.update(self.incoming_viewing_public_key.to_bytes());
 
         <TreeHashType>::from(hasher.finalize_fixed())
-    }
-
-    pub fn generate_new_private_key(&mut self) -> nssa::Address {
-        let private_key = nssa::PrivateKey::new_os_random();
-        let address = nssa::Address::from(&nssa::PublicKey::new_from_private_key(&private_key));
-
-        self.pub_account_signing_keys.insert(address, private_key);
-
-        address
-    }
-
-    /// Returns the signing key for public transaction signatures
-    pub fn get_pub_account_signing_key(
-        &self,
-        address: &nssa::Address,
-    ) -> Option<&nssa::PrivateKey> {
-        self.pub_account_signing_keys.get(address)
     }
 
     pub fn calculate_shared_secret_receiver(
         &self,
         ephemeral_public_key_sender: AffinePoint,
     ) -> AffinePoint {
-        (ephemeral_public_key_sender * self.utxo_secret_key_holder.viewing_secret_key).into()
+        (ephemeral_public_key_sender
+            * self
+                .top_secret_key_holder
+                .generate_incloming_viewing_secret_key())
+        .into()
     }
 
     pub fn decrypt_data(
@@ -197,9 +159,19 @@ mod tests {
     fn test_decrypt_data() {
         let address_key_holder = KeyChain::new_os_random();
 
+        let test_receiver_nullifier_public_key = [42; 32];
+        let sender_outgoing_viewing_key = address_key_holder
+            .top_secret_key_holder
+            .generate_outgoing_viewing_secret_key();
+        let nonce = 0;
+
         // Generate an ephemeral key and shared secret
-        let ephemeral_public_key_sender =
-            EphemeralKeyHolder::new_os_random().generate_ephemeral_public_key();
+        let ephemeral_public_key_sender = EphemeralKeyHolder::new(
+            test_receiver_nullifier_public_key,
+            sender_outgoing_viewing_key,
+            nonce,
+        )
+        .generate_ephemeral_public_key();
         let shared_secret =
             address_key_holder.calculate_shared_secret_receiver(ephemeral_public_key_sender);
 
@@ -338,19 +310,6 @@ mod tests {
 
         // Verify the decrypted data matches the original plaintext
         assert_eq!(decrypted_data, plaintext);
-    }
-
-    #[test]
-    fn test_get_public_account_signing_key() {
-        let mut address_key_holder = KeyChain::new_os_random();
-
-        let address = address_key_holder.generate_new_private_key();
-
-        let is_private_key_generated = address_key_holder
-            .get_pub_account_signing_key(&address)
-            .is_some();
-
-        assert!(is_private_key_generated);
     }
 
     #[test]

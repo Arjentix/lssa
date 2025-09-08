@@ -45,7 +45,7 @@ impl SeedHolder {
         let mut hash = hmac_sha512::HMAC::mac(&self.seed, "NSSA_seed");
 
         for _ in 1..2048 {
-            hash = hmac_sha512::HMAC::mac(&hash, "NSSA_seed");
+            hash = hmac_sha512::HMAC::mac(hash, "NSSA_seed");
         }
 
         //Safe unwrap
@@ -64,7 +64,7 @@ impl TopSecretKeyHolder {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update("NSSA_keys");
-        hasher.update(&self.secret_spending_key);
+        hasher.update(self.secret_spending_key);
         hasher.update([1u8]);
         hasher.update([0u8; 176]);
 
@@ -75,7 +75,7 @@ impl TopSecretKeyHolder {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update("NSSA_keys");
-        hasher.update(&self.secret_spending_key);
+        hasher.update(self.secret_spending_key);
         hasher.update([2u8]);
         hasher.update([0u8; 176]);
 
@@ -88,7 +88,7 @@ impl TopSecretKeyHolder {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update("NSSA_keys");
-        hasher.update(&self.secret_spending_key);
+        hasher.update(self.secret_spending_key);
         hasher.update([3u8]);
         hasher.update([0u8; 176]);
 
@@ -111,7 +111,7 @@ impl PrivateKeyHolder {
         let mut hasher = sha2::Sha256::new();
 
         hasher.update("NSSA_keys");
-        hasher.update(&self.nullifier_secret_key);
+        hasher.update(self.nullifier_secret_key);
         hasher.update([7u8]);
         hasher.update([0u8; 176]);
 
