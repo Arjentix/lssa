@@ -6,4 +6,3 @@ data/
 .idea/
 .vscode/
 rocksdb
-Cargo.lock
