@@ -21,7 +21,6 @@ impl WalletChainStore {
 
         Ok(Self {
             user_data: NSSAUserData::new_with_accounts(accounts_keys, HashMap::new())?,
-            utxo_commitments_store,
             wallet_config: config,
         })
     }
