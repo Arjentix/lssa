@@ -4,11 +4,11 @@ use nssa_core::{
     account::AccountWithMetadata,
     program::{InstructionData, ProgramOutput},
 };
-use risc0_zkvm::{ExecutorEnv, Receipt, default_prover};
+use risc0_zkvm::{ExecutorEnv, InnerReceipt, Receipt, default_prover};
 
 use crate::{error::NssaError, program::Program};
 
-use program_methods::PRIVACY_PRESERVING_CIRCUIT_ELF;
+use program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID};
 
 /// Proof of the privacy preserving execution circuit
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -76,6 +76,14 @@ fn execute_and_prove_program(
         .prove(env, program.elf())
         .map_err(|e| NssaError::ProgramProveFailed(e.to_string()))?
         .receipt)
+}
+
+impl Proof {
+    pub(crate) fn is_valid_for(&self, circuit_output: &PrivacyPreservingCircuitOutput) -> bool {
+        let inner: InnerReceipt = borsh::from_slice(&self.0).unwrap();
+        let receipt = Receipt::new(inner, circuit_output.to_bytes());
+        receipt.verify(PRIVACY_PRESERVING_CIRCUIT_ID).is_ok()
+    }
 }
 
 #[cfg(test)]

@@ -1,12 +1,10 @@
 use std::io::{Cursor, Read};
 
 use nssa_core::{
-    Commitment, Nullifier, PrivacyPreservingCircuitOutput,
+    Commitment, Nullifier,
     account::Account,
     encryption::{Ciphertext, EphemeralPublicKey},
 };
-use program_methods::PRIVACY_PRESERVING_CIRCUIT_ID;
-use risc0_zkvm::{InnerReceipt, Receipt};
 
 use crate::{
     Address, PrivacyPreservingTransaction, PublicKey, Signature,
@@ -228,12 +226,6 @@ impl PrivacyPreservingTransaction {
 }
 
 impl Proof {
-    pub(crate) fn is_valid_for(&self, circuit_output: &PrivacyPreservingCircuitOutput) -> bool {
-        let inner: InnerReceipt = borsh::from_slice(&self.0).unwrap();
-        let receipt = Receipt::new(inner, circuit_output.to_bytes());
-        receipt.verify(PRIVACY_PRESERVING_CIRCUIT_ID).is_ok()
-    }
-
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::new();
         let proof_len = self.0.len() as u32;
