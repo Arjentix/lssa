@@ -80,17 +80,19 @@ impl TokenHolding {
     }
 }
 
-fn transfer(pre_states: Vec<AccountWithMetadata>, balance_to_move: u128) {
-    let [sender, recipient] = match pre_states.try_into() {
-        Ok(array) => array,
-        Err(_) => return,
-    };
+fn transfer(pre_states: &[AccountWithMetadata], balance_to_move: u128) -> Vec<Account> {
+    if pre_states.len() != 2 {
+        panic!("Invalid number of input accounts");
+    }
+    let sender = &pre_states[0];
+    let recipient = &pre_states[1];
 
-    let mut sender_holding = TokenHolding::parse(&sender.account.data).unwrap();
+    let mut sender_holding =
+        TokenHolding::parse(&sender.account.data).expect("Invalid sender data");
     let mut recipient_holding = if recipient.account == Account::default() {
         TokenHolding::new(&sender_holding.definition_id)
     } else {
-        TokenHolding::parse(&recipient.account.data).unwrap()
+        TokenHolding::parse(&recipient.account.data).expect("Invalid recipient data")
     };
 
     if sender_holding.definition_id != recipient_holding.definition_id {
@@ -122,21 +124,26 @@ fn transfer(pre_states: Vec<AccountWithMetadata>, balance_to_move: u128) {
         this
     };
 
-    write_nssa_outputs(vec![sender, recipient], vec![sender_post, recipient_post]);
+    vec![sender_post, recipient_post]
 }
 
-fn new_definition(pre_states: Vec<AccountWithMetadata>, name: [u8; 6], total_supply: u128) {
-    let [definition_target_account, holding_target_account] = match pre_states.try_into() {
-        Ok(array) => array,
-        Err(_) => return,
-    };
+fn new_definition(
+    pre_states: &[AccountWithMetadata],
+    name: [u8; 6],
+    total_supply: u128,
+) -> Vec<Account> {
+    if pre_states.len() != 2 {
+        panic!("Invalid number of input accounts");
+    }
+    let definition_target_account = &pre_states[0];
+    let holding_target_account = &pre_states[1];
 
     if definition_target_account.account != Account::default() {
-        panic!("Definition target account must have default values.");
+        panic!("Definition target account must have default values");
     }
 
     if holding_target_account.account != Account::default() {
-        panic!("Holding target account must have default values.");
+        panic!("Holding target account must have default values");
     }
 
     let token_definition = TokenDefinition {
@@ -157,10 +164,7 @@ fn new_definition(pre_states: Vec<AccountWithMetadata>, name: [u8; 6], total_sup
     let mut holding_target_account_post = holding_target_account.account.clone();
     holding_target_account_post.data = token_holding.into_data();
 
-    write_nssa_outputs(
-        vec![definition_target_account, holding_target_account],
-        vec![definition_target_account_post, holding_target_account_post],
-    );
+    vec![definition_target_account_post, holding_target_account_post]
 }
 
 type Instruction = [u8; 23];
@@ -173,17 +177,377 @@ fn main() {
 
     match instruction[0] {
         0 => {
+            // Parse instruction
             let total_supply = u128::from_le_bytes(instruction[1..17].try_into().unwrap());
             let name: [u8; 6] = instruction[17..].try_into().unwrap();
             assert_ne!(name, [0; 6]);
-            new_definition(pre_states, name, total_supply)
+
+            // Execute
+            let post_states = new_definition(&pre_states, name, total_supply);
+            write_nssa_outputs(pre_states, post_states);
         }
         1 => {
+            // Parse instruction
             let balance_to_move = u128::from_le_bytes(instruction[1..17].try_into().unwrap());
             let name: [u8; 6] = instruction[17..].try_into().unwrap();
             assert_eq!(name, [0; 6]);
-            transfer(pre_states, balance_to_move)
+
+            // Execute
+            let post_states = transfer(&pre_states, balance_to_move);
+            write_nssa_outputs(pre_states, post_states);
         }
         _ => panic!("Invalid instruction"),
     };
+}
+
+#[cfg(test)]
+mod tests {
+    use nssa_core::account::{Account, AccountId, AccountWithMetadata};
+
+    use crate::{TOKEN_HOLDING_DATA_SIZE, new_definition, transfer};
+
+    #[should_panic(expected = "Invalid number of input accounts")]
+    #[test]
+    fn test_call_new_definition_with_invalid_number_of_accounts_1() {
+        let pre_states = vec![AccountWithMetadata {
+            account: Account::default(),
+            is_authorized: true,
+            account_id: AccountId::new([1; 32]),
+        }];
+        let _post_states = new_definition(&pre_states, [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe], 10);
+    }
+
+    #[should_panic(expected = "Invalid number of input accounts")]
+    #[test]
+    fn test_call_new_definition_with_invalid_number_of_accounts_2() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([3; 32]),
+            },
+        ];
+        let _post_states = new_definition(&pre_states, [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe], 10);
+    }
+
+    #[should_panic(expected = "Definition target account must have default values")]
+    #[test]
+    fn test_new_definition_non_default_first_account_should_fail() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account {
+                    program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let _post_states = new_definition(&pre_states, [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe], 10);
+    }
+
+    #[should_panic(expected = "Holding target account must have default values")]
+    #[test]
+    fn test_new_definition_non_default_second_account_should_fail() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account {
+                    program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let _post_states = new_definition(&pre_states, [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe], 10);
+    }
+
+    #[test]
+    fn test_new_definition_with_valid_inputs_succeeds() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: false,
+                account_id: AccountId::new([
+                    1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                    23, 24, 25, 26, 27, 28, 29, 30, 31, 32,
+                ]),
+            },
+            AccountWithMetadata {
+                account: Account {
+                    ..Account::default()
+                },
+                is_authorized: false,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+
+        let post_states = new_definition(&pre_states, [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe], 10);
+        let [definition_account, holding_account] = post_states.try_into().ok().unwrap();
+        assert_eq!(
+            definition_account.data,
+            vec![
+                0, 0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0
+            ]
+        );
+        assert_eq!(
+            holding_account.data,
+            vec![
+                1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
+                23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0
+            ]
+        );
+    }
+
+    #[should_panic(expected = "Invalid number of input accounts")]
+    #[test]
+    fn test_call_transfer_with_invalid_number_of_accounts_1() {
+        let pre_states = vec![AccountWithMetadata {
+            account: Account::default(),
+            is_authorized: true,
+            account_id: AccountId::new([1; 32]),
+        }];
+        let _post_states = transfer(&pre_states, 10);
+    }
+
+    #[should_panic(expected = "Invalid number of input accounts")]
+    #[test]
+    fn test_call_transfer_with_invalid_number_of_accounts_2() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([3; 32]),
+            },
+        ];
+        let _post_states = transfer(&pre_states, 10);
+    }
+
+    #[should_panic(expected = "Invalid sender data")]
+    #[test]
+    fn test_transfer_invalid_instruction_type_should_fail() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account {
+                    // First byte should be 0x01  for transfers
+                    data: vec![0; TOKEN_HOLDING_DATA_SIZE],
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let _post_states = transfer(&pre_states, 10);
+    }
+
+    #[should_panic(expected = "Invalid sender data")]
+    #[test]
+    fn test_transfer_invalid_data_size_should_fail_1() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account {
+                    // Data must be of exact length `TOKEN_HOLDING_DATA_SIZE`
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE - 1],
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let _post_states = transfer(&pre_states, 10);
+    }
+
+    #[should_panic(expected = "Invalid sender data")]
+    #[test]
+    fn test_transfer_invalid_data_size_should_fail_2() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account {
+                    // Data must be of exact length `TOKEN_HOLDING_DATA_SIZE`
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE + 1],
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account::default(),
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let _post_states = transfer(&pre_states, 10);
+    }
+
+    #[should_panic(expected = "Sender and recipient definition id mismatch")]
+    #[test]
+    fn test_transfer_with_different_definition_ids_should_fail() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account {
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE],
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account {
+                    data: vec![1]
+                        .into_iter()
+                        .chain(vec![2; TOKEN_HOLDING_DATA_SIZE - 1])
+                        .collect(),
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let _post_states = transfer(&pre_states, 10);
+    }
+
+    #[should_panic(expected = "Insufficient balance")]
+    #[test]
+    fn test_transfer_with_insufficient_balance_should_fail() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account {
+                    // Account with balance 37
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE - 16]
+                        .into_iter()
+                        .chain(u128::to_le_bytes(37))
+                        .collect(),
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account {
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE],
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        // Attempt to transfer 38 tokens
+        let _post_states = transfer(&pre_states, 38);
+    }
+
+    #[should_panic(expected = "Sender authorization is missing")]
+    #[test]
+    fn test_transfer_without_sender_authorization_should_fail() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account {
+                    // Account with balance 37
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE - 16]
+                        .into_iter()
+                        .chain(u128::to_le_bytes(37))
+                        .collect(),
+                    ..Account::default()
+                },
+                is_authorized: false,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account {
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE],
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let _post_states = transfer(&pre_states, 37);
+    }
+
+    #[test]
+    fn test_transfer_with_valid_inputs_succeeds() {
+        let pre_states = vec![
+            AccountWithMetadata {
+                account: Account {
+                    // Account with balance 37
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE - 16]
+                        .into_iter()
+                        .chain(u128::to_le_bytes(37))
+                        .collect(),
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([1; 32]),
+            },
+            AccountWithMetadata {
+                account: Account {
+                    // Account with balance 255
+                    data: vec![1; TOKEN_HOLDING_DATA_SIZE - 16]
+                        .into_iter()
+                        .chain(u128::to_le_bytes(255))
+                        .collect(),
+                    ..Account::default()
+                },
+                is_authorized: true,
+                account_id: AccountId::new([2; 32]),
+            },
+        ];
+        let post_states = transfer(&pre_states, 11);
+        let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
+        assert_eq!(
+            sender_post.data,
+            vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+        assert_eq!(
+            recipient_post.data,
+            vec![
+                1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+    }
 }
