@@ -32,6 +32,17 @@ impl WalletChainStore {
         })
     }
 
+    pub fn insert_private_account_data(
+        &mut self,
+        addr: nssa::Address,
+        account: nssa_core::account::Account,
+    ) {
+        self.user_data
+            .user_private_accounts
+            .entry(addr)
+            .and_modify(|(_, acc)| *acc = account);
+    }
+
     pub(crate) fn insert_account_data(&mut self, acc_data: PersistentAccountData) {
         match acc_data {
             PersistentAccountData::Public(acc_data) => {

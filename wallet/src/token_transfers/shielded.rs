@@ -41,7 +41,6 @@ impl WalletCore {
                 is_authorized: true,
             };
 
-
             //Move into different function
             let mut esk = [0; 32];
             OsRng.fill_bytes(&mut esk);
