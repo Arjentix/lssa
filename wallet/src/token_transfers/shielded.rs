@@ -13,13 +13,13 @@ impl WalletCore {
         balance_to_move: u128,
     ) -> Result<(SendTxResponse, nssa_core::SharedSecretKey), ExecutionFailureKind> {
         let from_data = self.get_account(from).await;
-        let to_data = self.storage.user_data.get_private_account(&to);
+        let to_data = self.storage.user_data.get_private_account(&to).cloned();
 
         let Ok(from_acc) = from_data else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
-        let Some((to_keys, to_acc)) = to_data else {
+        let Some((to_keys, mut to_acc)) = to_data else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
@@ -29,8 +29,10 @@ impl WalletCore {
         if from_acc.balance >= balance_to_move {
             let program = nssa::program::Program::authenticated_transfer_program();
 
+            to_acc.program_owner = program.id();
+
             let receiver_commitment =
-                nssa_core::Commitment::new(&to_keys.nullifer_public_key, to_acc);
+                nssa_core::Commitment::new(&to_keys.nullifer_public_key, &to_acc);
 
             let sender_pre = nssa_core::account::AccountWithMetadata {
                 account: from_acc.clone(),

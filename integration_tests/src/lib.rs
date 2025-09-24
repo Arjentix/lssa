@@ -407,6 +407,7 @@ pub async fn test_success_private_transfer_to_another_foreign_account() {
             .get_private_account_mut(&from)
             .unwrap();
 
+        from_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
         from_acc.1.balance -= 100;
         from_acc.1.nonce += 1;
 
@@ -415,10 +416,7 @@ pub async fn test_success_private_transfer_to_another_foreign_account() {
 
     let new_commitment2 = {
         let to_acc = nssa_core::account::Account {
-            program_owner: [
-                1793544791, 852173979, 3315478100, 4158236927, 146723505, 3793635251, 999304864,
-                2535706995,
-            ],
+            program_owner: nssa::program::Program::authenticated_transfer_program().id(),
             balance: 100,
             data: vec![],
             nonce: 1,
@@ -471,6 +469,7 @@ pub async fn test_success_deshielded_transfer_to_another_account() {
             .get_private_account_mut(&from)
             .unwrap();
 
+        from_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
         from_acc.1.balance -= 100;
         from_acc.1.nonce += 1;
 
@@ -521,6 +520,7 @@ pub async fn test_success_shielded_transfer_to_another_owned_account() {
             .get_private_account_mut(&to)
             .unwrap();
 
+        to_acc.1.program_owner = nssa::program::Program::authenticated_transfer_program().id();
         to_acc.1.balance += 100;
         to_acc.1.nonce += 1;
 
@@ -568,10 +568,7 @@ pub async fn test_success_shielded_transfer_to_another_foreign_account() {
 
     let new_commitment2 = {
         let to_acc = nssa_core::account::Account {
-            program_owner: [
-                1793544791, 852173979, 3315478100, 4158236927, 146723505, 3793635251, 999304864,
-                2535706995,
-            ],
+            program_owner: nssa::program::Program::authenticated_transfer_program().id(),
             balance: 100,
             data: vec![],
             nonce: 1,
@@ -686,6 +683,10 @@ pub async fn main_tests_runner() -> Result<()> {
             test_cleanup_wrap!(
                 home_dir,
                 test_success_shielded_transfer_to_another_owned_account
+            );
+            test_cleanup_wrap!(
+                home_dir,
+                test_success_shielded_transfer_to_another_foreign_account
             );
         }
         _ => {
