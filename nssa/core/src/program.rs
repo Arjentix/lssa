@@ -53,21 +53,29 @@ pub fn validate_execution(
         return false;
     }
 
+    println!("HELLO 1");
+
     for (pre, post) in pre_states.iter().zip(post_states) {
         // 2. Nonce must remain unchanged
         if pre.account.nonce != post.nonce {
             return false;
         }
 
+        println!("HELLO 2");
+
         // 3. Ownership change only allowed from default accounts
         if pre.account.program_owner != post.program_owner && pre.account != Account::default() {
             return false;
         }
 
+        println!("HELLO 3");
+
         // 4. Decreasing balance only allowed if owned by executing program
         if post.balance < pre.account.balance && pre.account.program_owner != executing_program_id {
             return false;
         }
+
+        println!("HELLO 4");
 
         // 5. Data changes only allowed if owned by executing program
         if pre.account.data != post.data
@@ -76,6 +84,8 @@ pub fn validate_execution(
         {
             return false;
         }
+
+        println!("HELLO 5");
     }
 
     // 6. Total balance is preserved

@@ -49,13 +49,27 @@ impl std::error::Error for TransactionMalformationErrorKind {}
 
 impl SequencerCore {
     pub fn start_from_config(config: SequencerConfig) -> Self {
+        let mut initial_commitments = vec![];
+
+        for init_comm_data in config.initial_commitments.clone() {
+            let npk = init_comm_data.npk;
+
+            let mut acc = init_comm_data.account;
+
+            acc.program_owner = nssa::program::Program::authenticated_transfer_program().id();
+
+            let comm = nssa_core::Commitment::new(&npk, &acc);
+
+            initial_commitments.push(comm);
+        }
+
         Self {
             store: SequecerChainStore::new_with_genesis(
                 &config.home,
                 config.genesis_id,
                 config.is_genesis_random,
                 &config.initial_accounts,
-                &config.initial_commitments,
+                &initial_commitments,
                 nssa::PrivateKey::try_new(config.signing_key).unwrap(),
             ),
             mempool: MemPool::default(),

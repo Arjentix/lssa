@@ -110,14 +110,14 @@ impl WalletCore {
         to: Address,
         balance_to_move: u128,
     ) -> Result<(SendTxResponse, nssa_core::SharedSecretKey), ExecutionFailureKind> {
-        let from_data = self.storage.user_data.get_private_account(&from);
-        let to_data = self.storage.user_data.get_private_account(&to);
+        let from_data = self.storage.user_data.get_private_account(&from).cloned();
+        let to_data = self.storage.user_data.get_private_account(&to).cloned();
 
-        let Some((from_keys, from_acc)) = from_data else {
+        let Some((from_keys, mut from_acc)) = from_data else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
-        let Some((to_keys, to_acc)) = to_data else {
+        let Some((to_keys, mut to_acc)) = to_data else {
             return Err(ExecutionFailureKind::KeyNotFoundError);
         };
 
@@ -126,10 +126,17 @@ impl WalletCore {
 
         if from_acc.balance >= balance_to_move {
             let program = nssa::program::Program::authenticated_transfer_program();
+
+            //Kind of hacky solution
+            //The issue is that we don't have deterministic builds
+            //and native_token_transfer at different machine may be different
+            from_acc.program_owner = nssa::program::Program::authenticated_transfer_program().id();
+            to_acc.program_owner = nssa::program::Program::authenticated_transfer_program().id();
+
             let sender_commitment =
-                nssa_core::Commitment::new(&from_keys.nullifer_public_key, from_acc);
+                nssa_core::Commitment::new(&from_keys.nullifer_public_key, &from_acc);
             let receiver_commitment =
-                nssa_core::Commitment::new(&to_keys.nullifer_public_key, to_acc);
+                nssa_core::Commitment::new(&to_keys.nullifer_public_key, &to_acc);
 
             let sender_pre = nssa_core::account::AccountWithMetadata {
                 account: from_acc.clone(),
