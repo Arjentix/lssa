@@ -213,6 +213,21 @@ pub enum Command {
         #[arg(long)]
         amount: u128,
     },
+    ///Claim account `acc_addr` generated in transaction `tx_hash`, using secret `sh_secret` at ciphertext id `ciph_id`
+    ClaimPrivateAccount {
+        ///tx_hash - valid 32 byte hex string
+        #[arg(long)]
+        tx_hash: String,
+        ///acc_addr - valid 32 byte hex string
+        #[arg(long)]
+        acc_addr: String,
+        ///sh_secret - valid 32 byte hex string
+        #[arg(long)]
+        sh_secret: String,
+        ///ciph_id - id of cipher in transaction
+        #[arg(long)]
+        ciph_id: usize,
+    },
     ///Register new public account
     RegisterAccountPublic {},
     ///Register new private account
@@ -484,6 +499,46 @@ pub async fn execute_subcommand(command: Command) -> Result<()> {
                 println!("RES acc to {res_acc_to:#?}");
 
                 println!("Transaction data is {:?}", tx.message);
+            }
+
+            let path = wallet_core.store_persistent_accounts()?;
+
+            println!("Stored persistent accounts at {path:#?}");
+        }
+        Command::ClaimPrivateAccount {
+            tx_hash,
+            acc_addr,
+            sh_secret,
+            ciph_id,
+        } => {
+            let acc_addr = produce_account_addr_from_hex(acc_addr)?;
+
+            let secret_res = hex::decode(sh_secret)?;
+            let mut secret = [0; 32];
+            secret.copy_from_slice(&secret_res);
+            let secret = nssa_core::SharedSecretKey(secret);
+
+            let transfer_tx = wallet_core.poll_native_token_transfer(tx_hash).await?;
+
+            if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                let to_ebc = tx.message.encrypted_private_post_states[ciph_id].clone();
+                let to_comm = tx.message.new_commitments[ciph_id].clone();
+
+                let res_acc_to = nssa_core::EncryptionScheme::decrypt(
+                    &to_ebc.ciphertext,
+                    &secret,
+                    &to_comm,
+                    ciph_id as u32,
+                )
+                .unwrap();
+
+                println!("RES acc to {res_acc_to:#?}");
+
+                println!("Transaction data is {:?}", tx.message);
+
+                wallet_core
+                    .storage
+                    .insert_private_account_data(acc_addr, res_acc_to);
             }
 
             let path = wallet_core.store_persistent_accounts()?;
