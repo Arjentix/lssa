@@ -14,8 +14,8 @@ use common::{
         requests::{
             GetAccountBalanceRequest, GetAccountBalanceResponse, GetAccountRequest,
             GetAccountResponse, GetAccountsNoncesRequest, GetAccountsNoncesResponse,
-            GetInitialTestnetAccountsRequest, GetProofByCommitmentRequest,
-            GetProofByCommitmentResponse, GetTransactionByHashRequest,
+            GetInitialTestnetAccountsRequest, GetProofForCommitmentRequest,
+            GetProofForCommitmentResponse, GetTransactionByHashRequest,
             GetTransactionByHashResponse,
         },
     },
@@ -254,7 +254,7 @@ impl JsonHandler {
 
     /// Returns the commitment proof, corresponding to commitment
     async fn process_get_proof_by_commitment(&self, request: Request) -> Result<Value, RpcErr> {
-        let get_proof_req = GetProofByCommitmentRequest::parse(Some(request.params))?;
+        let get_proof_req = GetProofForCommitmentRequest::parse(Some(request.params))?;
 
         let membership_proof = {
             let state = self.sequencer_state.lock().await;
@@ -263,7 +263,7 @@ impl JsonHandler {
                 .state
                 .get_proof_for_commitment(&get_proof_req.commitment)
         };
-        let helperstruct = GetProofByCommitmentResponse { membership_proof };
+        let helperstruct = GetProofForCommitmentResponse { membership_proof };
         respond(helperstruct)
     }
 
