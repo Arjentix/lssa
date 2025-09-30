@@ -110,7 +110,7 @@ impl WalletCore {
         }
     }
 
-    pub async fn send_private_native_token_transfer(
+    pub async fn send_private_native_token_transfer_owned_account(
         &self,
         from: Address,
         to: Address,

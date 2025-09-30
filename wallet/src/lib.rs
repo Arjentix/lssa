@@ -216,7 +216,7 @@ pub enum Command {
     ///Send native token transfer from `from` to `to` for `amount`
     ///
     /// Private operation
-    SendNativeTokenTransferPrivate {
+    SendNativeTokenTransferPrivateOwnedAccount {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -401,12 +401,12 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::Empty
         }
-        Command::SendNativeTokenTransferPrivate { from, to, amount } => {
+        Command::SendNativeTokenTransferPrivateOwnedAccount { from, to, amount } => {
             let from = produce_account_addr_from_hex(from)?;
             let to = produce_account_addr_from_hex(to)?;
 
             let (res, secret) = wallet_core
-                .send_private_native_token_transfer(from, to, amount)
+                .send_private_native_token_transfer_owned_account(from, to, amount)
                 .await?;
 
             println!("Results of tx send is {res:#?}");
@@ -614,7 +614,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
                 nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
 
             let (res, secret) = wallet_core
-                .send_shielded_native_token_transfer_maybe_outer_account(
+                .send_shielded_native_token_transfer_outer_account(
                     from, to_npk, to_ipk, amount,
                 )
                 .await?;

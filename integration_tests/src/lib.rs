@@ -452,7 +452,7 @@ pub async fn test_success_token_program() {
 
 pub async fn test_success_private_transfer_to_another_owned_account() {
     info!("test_success_private_transfer_to_another_owned_account");
-    let command = Command::SendNativeTokenTransferPrivate {
+    let command = Command::SendNativeTokenTransferPrivateOwnedAccount {
         from: ACC_SENDER_PRIVATE.to_string(),
         to: ACC_RECEIVER_PRIVATE.to_string(),
         amount: 100,

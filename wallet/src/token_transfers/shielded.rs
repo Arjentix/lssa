@@ -98,7 +98,7 @@ impl WalletCore {
         }
     }
 
-    pub async fn send_shielded_native_token_transfer_maybe_outer_account(
+    pub async fn send_shielded_native_token_transfer_outer_account(
         &self,
         from: Address,
         to_npk: nssa_core::NullifierPublicKey,
