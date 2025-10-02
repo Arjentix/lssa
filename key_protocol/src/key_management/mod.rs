@@ -1,4 +1,3 @@
-use common::TreeHashType;
 use log::info;
 use nssa_core::{
     NullifierPublicKey, SharedSecretKey,
@@ -6,7 +5,6 @@ use nssa_core::{
 };
 use secret_holders::{PrivateKeyHolder, SecretSpendingKey, SeedHolder};
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, digest::FixedOutput};
 
 pub type PublicAccountSigningKey = [u8; 32];
 

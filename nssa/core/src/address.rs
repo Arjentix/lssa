@@ -1,9 +1,6 @@
-use risc0_zkvm::sha::{Impl, Sha256};
 use std::{fmt::Display, str::FromStr};
 
 use serde::{Deserialize, Serialize};
-
-use crate::account::AccountId;
 
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq)]
 #[cfg_attr(
@@ -62,7 +59,7 @@ impl Display for Address {
 
 #[cfg(test)]
 mod tests {
-    use crate::account::AccountId;
+    
 
     use super::{Address, AddressError};
 
