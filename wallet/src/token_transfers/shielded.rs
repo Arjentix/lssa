@@ -1,6 +1,7 @@
 use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use nssa::Address;
+use nssa_core::account::AccountWithMetadata;
 
 use crate::{WalletCore, helperfunctions::produce_random_nonces};
 
@@ -29,16 +30,10 @@ impl WalletCore {
             let receiver_commitment =
                 nssa_core::Commitment::new(&to_keys.nullifer_public_key, &to_acc);
 
-            let sender_pre = nssa_core::account::AccountWithMetadata {
-                account: from_acc.clone(),
-                is_authorized: true,
-                account_id: from,
-            };
-            let recipient_pre = nssa_core::account::AccountWithMetadata {
-                account: to_acc.clone(),
-                is_authorized: true,
-                account_id: (&to_npk).into(),
-            };
+            let sender_pre =
+                nssa_core::account::AccountWithMetadata::new(from_acc.clone(), true, from);
+            let recipient_pre =
+                nssa_core::account::AccountWithMetadata::new(to_acc.clone(), true, &to_npk);
 
             let eph_holder = EphemeralKeyHolder::new(&to_npk);
             let shared_secret = eph_holder.calculate_shared_secret_sender(&to_ipk);
@@ -117,17 +112,8 @@ impl WalletCore {
         if from_acc.balance >= balance_to_move {
             let program = nssa::program::Program::authenticated_transfer_program();
 
-            let sender_pre = nssa_core::account::AccountWithMetadata {
-                account: from_acc.clone(),
-                is_authorized: true,
-                account_id: from,
-            };
-
-            let recipient_pre = nssa_core::account::AccountWithMetadata {
-                account: to_acc.clone(),
-                is_authorized: false,
-                account_id: (&to_npk).into(),
-            };
+            let sender_pre = AccountWithMetadata::new(from_acc.clone(), true, from);
+            let recipient_pre = AccountWithMetadata::new(to_acc.clone(), false, &to_npk);
 
             let eph_holder = EphemeralKeyHolder::new(&to_npk);
             let shared_secret = eph_holder.calculate_shared_secret_sender(&to_ipk);

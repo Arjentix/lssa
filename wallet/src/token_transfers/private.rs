@@ -1,6 +1,7 @@
 use common::{ExecutionFailureKind, sequencer_client::json::SendTxResponse};
 use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use nssa::Address;
+use nssa_core::account::AccountWithMetadata;
 
 use crate::{WalletCore, helperfunctions::produce_random_nonces};
 
@@ -129,10 +130,8 @@ impl WalletCore {
             let sender_commitment = nssa_core::Commitment::new(&from_npk, &from_acc);
             let receiver_commitment = nssa_core::Commitment::new(&to_npk, &to_acc);
 
-            let sender_pre =
-                nssa_core::account::AccountWithMetadata::new(from_acc.clone(), true, &from_npk);
-            let recipient_pre =
-                nssa_core::account::AccountWithMetadata::new(to_acc.clone(), true, &to_npk);
+            let sender_pre = AccountWithMetadata::new(from_acc.clone(), true, &from_npk);
+            let recipient_pre = AccountWithMetadata::new(to_acc.clone(), true, &to_npk);
 
             let eph_holder_from = EphemeralKeyHolder::new(&from_npk);
             let shared_secret_from = eph_holder_from.calculate_shared_secret_sender(&from_ipk);
