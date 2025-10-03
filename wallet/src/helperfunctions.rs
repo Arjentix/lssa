@@ -5,7 +5,7 @@ use std::{fs::File, io::BufReader, path::PathBuf, str::FromStr};
 
 use anyhow::Result;
 use key_protocol::key_protocol_core::NSSAUserData;
-use nssa::{Account, Address};
+use nssa::Account;
 use serde::Serialize;
 
 use crate::{
