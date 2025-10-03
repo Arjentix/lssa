@@ -43,6 +43,7 @@ impl WalletChainStore {
         addr: nssa::Address,
         account: nssa_core::account::Account,
     ) {
+        println!("inserting at addres {}, this account {:?}", addr, account);
         self.user_data
             .user_private_accounts
             .entry(addr)

@@ -30,11 +30,6 @@ pub fn fetch_config() -> Result<WalletConfig> {
     Ok(serde_json::from_reader(reader)?)
 }
 
-// ToDo: Replace with structures conversion in future
-pub fn produce_account_addr_from_hex(hex_str: String) -> Result<Address> {
-    Ok(hex_str.parse()?)
-}
-
 /// Fetch list of accounts stored at `NSSA_WALLET_HOME_DIR/curr_accounts.json`
 ///
 /// If file not present, it is considered as empty list of persistent accounts
