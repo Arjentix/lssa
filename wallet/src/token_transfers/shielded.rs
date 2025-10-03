@@ -28,8 +28,6 @@ impl WalletCore {
         if from_acc.balance >= balance_to_move {
             let program = nssa::program::Program::authenticated_transfer_program();
 
-            to_acc.program_owner = program.id();
-
             let receiver_commitment =
                 nssa_core::Commitment::new(&to_keys.nullifer_public_key, &to_acc);
 

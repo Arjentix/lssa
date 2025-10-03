@@ -29,8 +29,6 @@ impl WalletCore {
             let npk_from = from_keys.nullifer_public_key;
             let ipk_from = from_keys.incoming_viewing_public_key;
 
-            from_acc.program_owner = program.id();
-
             let sender_commitment = nssa_core::Commitment::new(&npk_from, &from_acc);
 
             let sender_pre =

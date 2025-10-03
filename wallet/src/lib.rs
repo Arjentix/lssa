@@ -431,9 +431,13 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
                 )
                 .unwrap();
 
-                let res_acc_to =
-                    nssa_core::EncryptionScheme::decrypt(&to_ebc.ciphertext, &secret_to, &to_comm, 1)
-                        .unwrap();
+                let res_acc_to = nssa_core::EncryptionScheme::decrypt(
+                    &to_ebc.ciphertext,
+                    &secret_to,
+                    &to_comm,
+                    1,
+                )
+                .unwrap();
 
                 println!("Received new from acc {res_acc_from:#?}");
                 println!("Received new to acc {res_acc_to:#?}");
@@ -498,9 +502,13 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
                 )
                 .unwrap();
 
-                let res_acc_to =
-                    nssa_core::EncryptionScheme::decrypt(&to_ebc.ciphertext, &secret_to, &to_comm, 1)
-                        .unwrap();
+                let res_acc_to = nssa_core::EncryptionScheme::decrypt(
+                    &to_ebc.ciphertext,
+                    &secret_to,
+                    &to_comm,
+                    1,
+                )
+                .unwrap();
 
                 println!("RES acc {res_acc_from:#?}");
                 println!("RES acc to {res_acc_to:#?}");
@@ -712,7 +720,10 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             println!("Generated new account with addr {addr}");
             println!("With npk {}", hex::encode(&key.nullifer_public_key));
-            println!("With ipk {}", hex::encode(&key.incoming_viewing_public_key.to_bytes()));
+            println!(
+                "With ipk {}",
+                hex::encode(&key.incoming_viewing_public_key.to_bytes())
+            );
 
             let path = wallet_core.store_persistent_accounts()?;
 

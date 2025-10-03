@@ -26,8 +26,6 @@ impl WalletCore {
             let from_npk = from_keys.nullifer_public_key;
             let from_ipk = from_keys.incoming_viewing_public_key;
 
-            from_acc.program_owner = program.id();
-
             let sender_commitment = nssa_core::Commitment::new(&from_npk, &from_acc);
 
             let sender_pre =
@@ -127,9 +125,6 @@ impl WalletCore {
 
         if from_acc.balance >= balance_to_move {
             let program = nssa::program::Program::authenticated_transfer_program();
-
-            from_acc.program_owner = program.id();
-            to_acc.program_owner = program.id();
 
             let sender_commitment = nssa_core::Commitment::new(&from_npk, &from_acc);
             let receiver_commitment = nssa_core::Commitment::new(&to_npk, &to_acc);

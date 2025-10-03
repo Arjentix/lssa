@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use key_protocol::key_protocol_core::NSSAUserData;
+use nssa::program::Program;
 
 use crate::config::{InitialAccountData, PersistentAccountData, WalletConfig};
 
@@ -21,8 +22,12 @@ impl WalletChainStore {
                     public_init_acc_map.insert(data.address.parse()?, data.pub_sign_key);
                 }
                 InitialAccountData::Private(data) => {
-                    private_init_acc_map
-                        .insert(data.address.parse()?, (data.key_chain, data.account));
+                    let mut account = data.account;
+                    // TODO: Program owner is only known after code is compiled and can't be set in
+                    // the config. Therefore we overwrite it here on startup. Fix this when program
+                    // id can be fetched from the node and queried from the wallet.
+                    account.program_owner = Program::authenticated_transfer_program().id();
+                    private_init_acc_map.insert(data.address.parse()?, (data.key_chain, account));
                 }
             }
         }
