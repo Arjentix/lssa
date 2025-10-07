@@ -10,16 +10,17 @@ use common::{
 use anyhow::Result;
 use chain_storage::WalletChainStore;
 use config::WalletConfig;
+use key_protocol::key_management::ephemeral_key_holder::EphemeralKeyHolder;
 use log::info;
-use nssa::{Account, Address};
+use nssa::{Account, Address, privacy_preserving_transaction::circuit};
 
 use clap::{Parser, Subcommand};
-use nssa_core::Commitment;
+use nssa_core::{Commitment, SharedSecretKey, account::AccountWithMetadata};
 
 use crate::{
     helperfunctions::{
         HumanReadableAccount, fetch_config, fetch_persistent_accounts, get_home,
-        produce_data_for_storage,
+        produce_data_for_storage, produce_random_nonces,
     },
     poller::TxPoller,
 };
@@ -103,6 +104,84 @@ impl WalletCore {
         let tx = nssa::PublicTransaction::new(message, witness_set);
 
         Ok(self.sequencer_client.send_tx_public(tx).await?)
+    }
+
+    pub async fn claim_pinata_private_owned_account(
+        &self,
+        pinata_addr: Address,
+        winner_addr: Address,
+        solution: u128,
+    ) -> Result<(SendTxResponse, [SharedSecretKey; 1]), ExecutionFailureKind> {
+        let Some((winner_keys, winner_acc)) = self
+            .storage
+            .user_data
+            .get_private_account(&winner_addr)
+            .cloned()
+        else {
+            return Err(ExecutionFailureKind::KeyNotFoundError);
+        };
+
+        let pinata_acc = self.get_account_public(pinata_addr).await.unwrap();
+
+        let winner_npk = winner_keys.nullifer_public_key;
+        let winner_ipk = winner_keys.incoming_viewing_public_key;
+
+        let program = nssa::program::Program::pinata();
+
+        let winner_commitment = Commitment::new(&winner_npk, &winner_acc);
+
+        let pinata_pre = AccountWithMetadata::new(pinata_acc, false, pinata_addr);
+        let winner_pre = AccountWithMetadata::new(winner_acc.clone(), true, &winner_npk);
+
+        let eph_holder_winner = EphemeralKeyHolder::new(&winner_npk);
+        let shared_secret_winner = eph_holder_winner.calculate_shared_secret_sender(&winner_ipk);
+
+        let (output, proof) = circuit::execute_and_prove(
+            &[pinata_pre, winner_pre],
+            &nssa::program::Program::serialize_instruction(solution).unwrap(),
+            &[0, 1],
+            &produce_random_nonces(1),
+            &[(winner_npk.clone(), shared_secret_winner.clone())],
+            &[(
+                winner_keys.private_key_holder.nullifier_secret_key,
+                self.sequencer_client
+                    .get_proof_for_commitment(winner_commitment)
+                    .await
+                    .unwrap()
+                    .unwrap(),
+            )],
+            &program,
+        )
+        .unwrap();
+
+        let message =
+            nssa::privacy_preserving_transaction::message::Message::try_from_circuit_output(
+                vec![],
+                vec![],
+                vec![(
+                    winner_npk.clone(),
+                    winner_ipk.clone(),
+                    eph_holder_winner.generate_ephemeral_public_key(),
+                )],
+                output,
+            )
+            .unwrap();
+
+        let witness_set =
+            nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
+                &message,
+                proof,
+                &[],
+            );
+        let tx = nssa::privacy_preserving_transaction::PrivacyPreservingTransaction::new(
+            message,
+            witness_set,
+        );
+
+        Ok((
+            self.sequencer_client.send_tx_private(tx).await?,
+            [shared_secret_winner],
+        ))
     }
 
     pub async fn send_new_token_definition(
