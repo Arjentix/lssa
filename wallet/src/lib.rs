@@ -208,6 +208,122 @@ impl WalletCore {
         Ok(self.sequencer_client.send_tx_public(tx).await?)
     }
 
+    pub async fn send_new_token_definition_private_owned(
+        &self,
+        definition_addr: Address,
+        supply_addr: Address,
+        name: [u8; 6],
+        total_supply: u128,
+    ) -> Result<(SendTxResponse, [SharedSecretKey; 2]), ExecutionFailureKind> {
+        let Some((definition_keys, definition_acc)) = self
+            .storage
+            .user_data
+            .get_private_account(&definition_addr)
+            .cloned()
+        else {
+            return Err(ExecutionFailureKind::KeyNotFoundError);
+        };
+
+        let Some((supply_keys, supply_acc)) = self
+            .storage
+            .user_data
+            .get_private_account(&supply_addr)
+            .cloned()
+        else {
+            return Err(ExecutionFailureKind::KeyNotFoundError);
+        };
+
+        let definition_npk = definition_keys.nullifer_public_key;
+        let definition_ipk = definition_keys.incoming_viewing_public_key;
+        let supply_npk = supply_keys.nullifer_public_key.clone();
+        let supply_ipk = supply_keys.incoming_viewing_public_key.clone();
+
+        let program = nssa::program::Program::token();
+
+        let definition_commitment = Commitment::new(&definition_npk, &definition_acc);
+        let supply_commitment = Commitment::new(&supply_npk, &supply_acc);
+
+        let definition_pre =
+            AccountWithMetadata::new(definition_acc.clone(), true, &definition_npk);
+        let supply_pre = AccountWithMetadata::new(supply_acc.clone(), true, &supply_npk);
+
+        let eph_holder_definition = EphemeralKeyHolder::new(&definition_npk);
+        let shared_secret_definition =
+            eph_holder_definition.calculate_shared_secret_sender(&definition_ipk);
+
+        let eph_holder_supply = EphemeralKeyHolder::new(&supply_npk);
+        let shared_secret_supply = eph_holder_supply.calculate_shared_secret_sender(&supply_ipk);
+
+        // Instruction must be: [0x00 || total_supply (little-endian 16 bytes) || name (6 bytes)]
+        let mut instruction = [0; 23];
+        instruction[1..17].copy_from_slice(&total_supply.to_le_bytes());
+        instruction[17..].copy_from_slice(&name);
+
+        let (output, proof) = circuit::execute_and_prove(
+            &[definition_pre, supply_pre],
+            &nssa::program::Program::serialize_instruction(instruction).unwrap(),
+            &[1, 1],
+            &produce_random_nonces(2),
+            &[
+                (definition_npk.clone(), shared_secret_definition.clone()),
+                (supply_npk.clone(), shared_secret_supply.clone()),
+            ],
+            &[
+                (
+                    definition_keys.private_key_holder.nullifier_secret_key,
+                    self.sequencer_client
+                        .get_proof_for_commitment(definition_commitment)
+                        .await
+                        .unwrap()
+                        .unwrap(),
+                ),
+                (
+                    supply_keys.private_key_holder.nullifier_secret_key,
+                    self.sequencer_client
+                        .get_proof_for_commitment(supply_commitment)
+                        .await
+                        .unwrap()
+                        .unwrap(),
+                ),
+            ],
+            &program,
+        )
+        .unwrap();
+
+        let message =
+            nssa::privacy_preserving_transaction::message::Message::try_from_circuit_output(
+                vec![],
+                vec![],
+                vec![
+                    (
+                        definition_npk.clone(),
+                        definition_ipk.clone(),
+                        eph_holder_definition.generate_ephemeral_public_key(),
+                    ),
+                    (
+                        supply_npk.clone(),
+                        supply_ipk.clone(),
+                        eph_holder_supply.generate_ephemeral_public_key(),
+                    ),
+                ],
+                output,
+            )
+            .unwrap();
+
+        let witness_set =
+            nssa::privacy_preserving_transaction::witness_set::WitnessSet::for_message(
+                &message,
+                proof,
+                &[],
+            );
+        let tx = nssa::PrivacyPreservingTransaction::new(message, witness_set);
+
+        Ok((
+            self.sequencer_client.send_tx_private(tx).await?,
+            [shared_secret_definition, shared_secret_supply],
+        ))
+    }
+
     pub async fn send_transfer_token_transaction(
         &self,
         sender_address: Address,
