@@ -789,7 +789,8 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
         Command::GetPrivateAccount { addr } => {
             let addr: Address = addr.parse()?;
             if let Some(account) = wallet_core.get_account_private(&addr) {
-                println!("{}", serde_json::to_string(&account).unwrap());
+                let account_hr: HumanReadableAccount = account.into();
+                println!("{}", serde_json::to_string(&account_hr).unwrap());
             } else {
                 println!("Private account not found.");
             }

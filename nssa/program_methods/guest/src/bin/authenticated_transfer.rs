@@ -3,12 +3,7 @@ use nssa_core::{
     program::{ProgramInput, read_nssa_inputs, write_nssa_outputs},
 };
 
-fn initialize_account(pre_states: Vec<AccountWithMetadata>) {
-    // Continue only if input_accounts is an array of one element
-    let [pre_state] = match pre_states.try_into() {
-        Ok(array) => array,
-        Err(_) => return,
-    };
+fn initialize_account(pre_state: AccountWithMetadata) {
     let account_to_claim = pre_state.account.clone();
     let is_authorized = pre_state.is_authorized;
 
@@ -26,13 +21,7 @@ fn initialize_account(pre_states: Vec<AccountWithMetadata>) {
     write_nssa_outputs(vec![pre_state], vec![account_to_claim]);
 }
 
-fn transfer(pre_states: Vec<AccountWithMetadata>, balance_to_move: u128) {
-    // Continue only if input_accounts is an array of two elements
-    let [sender, receiver] = match pre_states.try_into() {
-        Ok(array) => array,
-        Err(_) => return,
-    };
-
+fn transfer(sender: AccountWithMetadata, recipient: AccountWithMetadata, balance_to_move: u128) {
     // Continue only if the sender has authorized this operation
     if !sender.is_authorized {
         return;
@@ -45,26 +34,27 @@ fn transfer(pre_states: Vec<AccountWithMetadata>, balance_to_move: u128) {
 
     // Create accounts post states, with updated balances
     let mut sender_post = sender.account.clone();
-    let mut receiver_post = receiver.account.clone();
+    let mut recipient_post = recipient.account.clone();
     sender_post.balance -= balance_to_move;
-    receiver_post.balance += balance_to_move;
+    recipient_post.balance += balance_to_move;
 
-    write_nssa_outputs(vec![sender, receiver], vec![sender_post, receiver_post]);
+    write_nssa_outputs(vec![sender, recipient], vec![sender_post, recipient_post]);
 }
 
 /// A transfer of balance program.
 /// To be used both in public and private contexts.
 fn main() {
     // Read input accounts.
-    // It is expected to receive only two accounts: [sender_account, receiver_account]
     let ProgramInput {
         pre_states,
         instruction: balance_to_move,
     } = read_nssa_inputs();
 
-    match (pre_states.len(), balance_to_move) {
-        (1, 0) => initialize_account(pre_states),
-        (2, balance_to_move) => transfer(pre_states, balance_to_move),
-        _ => panic!("Invalid parameters"),
+    match (pre_states.as_slice(), balance_to_move) {
+        ([account_to_claim], 0) => initialize_account(account_to_claim.clone()),
+        ([sender, recipient], balance_to_move) => {
+            transfer(sender.clone(), recipient.clone(), balance_to_move)
+        }
+        _ => panic!("invalid params"),
     }
 }
