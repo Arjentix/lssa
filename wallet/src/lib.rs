@@ -338,7 +338,7 @@ pub enum Command {
         #[arg(long)]
         solution: u128,
     },
-    ///Test command
+    ///Token command
     #[command(subcommand)]
     TokenProgram(TokenProgramSubcommand),
 }

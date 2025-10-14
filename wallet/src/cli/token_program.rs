@@ -5,9 +5,20 @@ use nssa::Address;
 
 use crate::{SubcommandReturnValue, WalletCore, cli::WalletSubcommand};
 
-///Represents CLI subcommand for a wallet working with token_program
+///Represents generic CLI subcommand for a wallet working with token_program
 #[derive(Subcommand, Debug, Clone)]
 pub enum TokenProgramSubcommand {
+    ///Public execution
+    #[command(subcommand)]
+    Public(TokenProgramSubcommandPublic),
+    ///Private execution
+    #[command(subcommand)]
+    Private(TokenProgramSubcommandPrivate),
+}
+
+///Represents generic public CLI subcommand for a wallet working with token_program
+#[derive(Subcommand, Debug, Clone)]
+pub enum TokenProgramSubcommandPublic {
     //Create a new token using the token program
     CreateNewToken {
         #[arg(short, long)]
@@ -28,6 +39,11 @@ pub enum TokenProgramSubcommand {
         #[arg(short, long)]
         balance_to_move: u128,
     },
+}
+
+///Represents generic public CLI subcommand for a wallet working with token_program
+#[derive(Subcommand, Debug, Clone)]
+pub enum TokenProgramSubcommandPrivate {
     //Create a new token using the token program
     CreateNewTokenPrivateOwned {
         #[arg(short, long)]
@@ -40,16 +56,7 @@ pub enum TokenProgramSubcommand {
         total_supply: u128,
     },
     //Transfer tokens using the token program
-    TransferTokenPrivateOwnedAlreadyInitialized {
-        #[arg(short, long)]
-        sender_addr: String,
-        #[arg(short, long)]
-        recipient_addr: String,
-        #[arg(short, long)]
-        balance_to_move: u128,
-    },
-    //Transfer tokens using the token program
-    TransferTokenPrivateOwnedNotInitialized {
+    TransferTokenPrivateOwned {
         #[arg(short, long)]
         sender_addr: String,
         #[arg(short, long)]
@@ -72,13 +79,13 @@ pub enum TokenProgramSubcommand {
     },
 }
 
-impl WalletSubcommand for TokenProgramSubcommand {
+impl WalletSubcommand for TokenProgramSubcommandPublic {
     async fn handle_subcommand(
         self,
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            TokenProgramSubcommand::CreateNewToken {
+            TokenProgramSubcommandPublic::CreateNewToken {
                 definition_addr,
                 supply_addr,
                 name,
@@ -101,7 +108,31 @@ impl WalletSubcommand for TokenProgramSubcommand {
                     .await?;
                 Ok(SubcommandReturnValue::Empty)
             }
-            TokenProgramSubcommand::CreateNewTokenPrivateOwned {
+            TokenProgramSubcommandPublic::TransferToken {
+                sender_addr,
+                recipient_addr,
+                balance_to_move,
+            } => {
+                wallet_core
+                    .send_transfer_token_transaction(
+                        sender_addr.parse().unwrap(),
+                        recipient_addr.parse().unwrap(),
+                        balance_to_move,
+                    )
+                    .await?;
+                Ok(SubcommandReturnValue::Empty)
+            }
+        }
+    }
+}
+
+impl WalletSubcommand for TokenProgramSubcommandPrivate {
+    async fn handle_subcommand(
+        self,
+        wallet_core: &mut WalletCore,
+    ) -> Result<SubcommandReturnValue> {
+        match self {
+            TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
                 definition_addr,
                 supply_addr,
                 name,
@@ -135,24 +166,12 @@ impl WalletSubcommand for TokenProgramSubcommand {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let supply_ebc = tx.message.encrypted_private_post_states[0].clone();
-                    let supply_comm = tx.message.new_commitments[0].clone();
+                    let acc_decode_data = vec![(secret_supply, supply_addr)];
 
-                    let res_acc_supply = nssa_core::EncryptionScheme::decrypt(
-                        &supply_ebc.ciphertext,
-                        &secret_supply,
-                        &supply_comm,
-                        0,
-                    )
-                    .unwrap();
-
-                    println!("Received new to acc {res_acc_supply:#?}");
-
-                    println!("Transaction data is {:?}", tx.message);
-
-                    wallet_core
-                        .storage
-                        .insert_private_account_data(supply_addr, res_acc_supply);
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
                 }
 
                 let path = wallet_core.store_persistent_accounts()?;
@@ -161,21 +180,7 @@ impl WalletSubcommand for TokenProgramSubcommand {
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
-            TokenProgramSubcommand::TransferToken {
-                sender_addr,
-                recipient_addr,
-                balance_to_move,
-            } => {
-                wallet_core
-                    .send_transfer_token_transaction(
-                        sender_addr.parse().unwrap(),
-                        recipient_addr.parse().unwrap(),
-                        balance_to_move,
-                    )
-                    .await?;
-                Ok(SubcommandReturnValue::Empty)
-            }
-            TokenProgramSubcommand::TransferTokenPrivateOwnedAlreadyInitialized {
+            TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
                 sender_addr,
                 recipient_addr,
                 balance_to_move,
@@ -183,13 +188,27 @@ impl WalletSubcommand for TokenProgramSubcommand {
                 let sender_addr: Address = sender_addr.parse().unwrap();
                 let recipient_addr: Address = recipient_addr.parse().unwrap();
 
-                let (res, [secret_sender, secret_recipient]) = wallet_core
-                    .send_transfer_token_transaction_private_owned_account_already_initialized(
-                        sender_addr,
-                        recipient_addr,
-                        balance_to_move,
-                    )
-                    .await?;
+                let recipient_initialized = wallet_core
+                    .check_private_account_initialized(&recipient_addr)
+                    .await;
+
+                let (res, [secret_sender, secret_recipient]) = if recipient_initialized {
+                    wallet_core
+                        .send_transfer_token_transaction_private_owned_account_already_initialized(
+                            sender_addr,
+                            recipient_addr,
+                            balance_to_move,
+                        )
+                        .await?
+                } else {
+                    wallet_core
+                        .send_transfer_token_transaction_private_owned_account_not_initialized(
+                            sender_addr,
+                            recipient_addr,
+                            balance_to_move,
+                        )
+                        .await?
+                };
 
                 println!("Results of tx send is {res:#?}");
 
@@ -199,39 +218,15 @@ impl WalletSubcommand for TokenProgramSubcommand {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let sender_ebc = tx.message.encrypted_private_post_states[0].clone();
-                    let sender_comm = tx.message.new_commitments[0].clone();
+                    let acc_decode_data = vec![
+                        (secret_sender, sender_addr),
+                        (secret_recipient, recipient_addr),
+                    ];
 
-                    let recipient_ebc = tx.message.encrypted_private_post_states[1].clone();
-                    let recipient_comm = tx.message.new_commitments[1].clone();
-
-                    let res_acc_sender = nssa_core::EncryptionScheme::decrypt(
-                        &sender_ebc.ciphertext,
-                        &secret_sender,
-                        &sender_comm,
-                        0,
-                    )
-                    .unwrap();
-
-                    let res_acc_recipient = nssa_core::EncryptionScheme::decrypt(
-                        &recipient_ebc.ciphertext,
-                        &secret_recipient,
-                        &recipient_comm,
-                        1,
-                    )
-                    .unwrap();
-
-                    println!("Received new sender acc {res_acc_sender:#?}");
-                    println!("Received new recipient acc {res_acc_recipient:#?}");
-
-                    println!("Transaction data is {:?}", tx.message);
-
-                    wallet_core
-                        .storage
-                        .insert_private_account_data(sender_addr, res_acc_sender);
-                    wallet_core
-                        .storage
-                        .insert_private_account_data(recipient_addr, res_acc_recipient);
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
                 }
 
                 let path = wallet_core.store_persistent_accounts()?;
@@ -240,72 +235,7 @@ impl WalletSubcommand for TokenProgramSubcommand {
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
-            TokenProgramSubcommand::TransferTokenPrivateOwnedNotInitialized {
-                sender_addr,
-                recipient_addr,
-                balance_to_move,
-            } => {
-                let sender_addr: Address = sender_addr.parse().unwrap();
-                let recipient_addr: Address = recipient_addr.parse().unwrap();
-
-                let (res, [secret_sender, secret_recipient]) = wallet_core
-                    .send_transfer_token_transaction_private_owned_account_not_initialized(
-                        sender_addr,
-                        recipient_addr,
-                        balance_to_move,
-                    )
-                    .await?;
-
-                println!("Results of tx send is {res:#?}");
-
-                let tx_hash = res.tx_hash;
-                let transfer_tx = wallet_core
-                    .poll_native_token_transfer(tx_hash.clone())
-                    .await?;
-
-                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let sender_ebc = tx.message.encrypted_private_post_states[0].clone();
-                    let sender_comm = tx.message.new_commitments[0].clone();
-
-                    let recipient_ebc = tx.message.encrypted_private_post_states[1].clone();
-                    let recipient_comm = tx.message.new_commitments[1].clone();
-
-                    let res_acc_sender = nssa_core::EncryptionScheme::decrypt(
-                        &sender_ebc.ciphertext,
-                        &secret_sender,
-                        &sender_comm,
-                        0,
-                    )
-                    .unwrap();
-
-                    let res_acc_recipient = nssa_core::EncryptionScheme::decrypt(
-                        &recipient_ebc.ciphertext,
-                        &secret_recipient,
-                        &recipient_comm,
-                        1,
-                    )
-                    .unwrap();
-
-                    println!("Received new sender acc {res_acc_sender:#?}");
-                    println!("Received new recipient acc {res_acc_recipient:#?}");
-
-                    println!("Transaction data is {:?}", tx.message);
-
-                    wallet_core
-                        .storage
-                        .insert_private_account_data(sender_addr, res_acc_sender);
-                    wallet_core
-                        .storage
-                        .insert_private_account_data(recipient_addr, res_acc_recipient);
-                }
-
-                let path = wallet_core.store_persistent_accounts()?;
-
-                println!("Stored persistent accounts at {path:#?}");
-
-                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
-            }
-            TokenProgramSubcommand::TransferTokenPrivateForeign {
+            TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
                 sender_addr,
                 recipient_npk,
                 recipient_ipk,
@@ -341,24 +271,12 @@ impl WalletSubcommand for TokenProgramSubcommand {
                     .await?;
 
                 if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                    let sender_ebc = tx.message.encrypted_private_post_states[0].clone();
-                    let sender_comm = tx.message.new_commitments[0].clone();
+                    let acc_decode_data = vec![(secret_sender, sender_addr)];
 
-                    let res_acc_sender = nssa_core::EncryptionScheme::decrypt(
-                        &sender_ebc.ciphertext,
-                        &secret_sender,
-                        &sender_comm,
-                        0,
-                    )
-                    .unwrap();
-
-                    println!("Received new sender acc {res_acc_sender:#?}");
-
-                    println!("Transaction data is {:?}", tx.message);
-
-                    wallet_core
-                        .storage
-                        .insert_private_account_data(sender_addr, res_acc_sender);
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
                 }
 
                 let path = wallet_core.store_persistent_accounts()?;
@@ -366,6 +284,22 @@ impl WalletSubcommand for TokenProgramSubcommand {
                 println!("Stored persistent accounts at {path:#?}");
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
+            }
+        }
+    }
+}
+
+impl WalletSubcommand for TokenProgramSubcommand {
+    async fn handle_subcommand(
+        self,
+        wallet_core: &mut WalletCore,
+    ) -> Result<SubcommandReturnValue> {
+        match self {
+            TokenProgramSubcommand::Private(private_subcommand) => {
+                private_subcommand.handle_subcommand(wallet_core).await
+            }
+            TokenProgramSubcommand::Public(public_subcommand) => {
+                public_subcommand.handle_subcommand(wallet_core).await
             }
         }
     }

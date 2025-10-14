@@ -19,7 +19,9 @@ use tempfile::TempDir;
 use tokio::task::JoinHandle;
 use wallet::{
     Command, SubcommandReturnValue, WalletCore,
-    cli::token_program::TokenProgramSubcommand,
+    cli::token_program::{
+        TokenProgramSubcommand, TokenProgramSubcommandPrivate, TokenProgramSubcommandPublic,
+    },
     config::PersistentAccountData,
     helperfunctions::{fetch_config, fetch_persistent_accounts},
 };
@@ -351,12 +353,12 @@ pub async fn test_success_token_program() {
         .expect("Failed to produce new account, not present in persistent accounts");
 
     // Create new token
-    let subcommand = TokenProgramSubcommand::CreateNewToken {
+    let subcommand = TokenProgramSubcommand::Public(TokenProgramSubcommandPublic::CreateNewToken {
         definition_addr: definition_addr.to_string(),
         supply_addr: supply_addr.to_string(),
         name: "A NAME".to_string(),
         total_supply: 37,
-    };
+    });
     wallet::execute_subcommand(Command::TokenProgram(subcommand))
         .await
         .unwrap();
@@ -405,11 +407,11 @@ pub async fn test_success_token_program() {
     );
 
     // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-    let subcommand = TokenProgramSubcommand::TransferToken {
+    let subcommand = TokenProgramSubcommand::Public(TokenProgramSubcommandPublic::TransferToken {
         sender_addr: supply_addr.to_string(),
         recipient_addr: recipient_addr.to_string(),
         balance_to_move: 7,
-    };
+    });
     wallet::execute_subcommand(Command::TokenProgram(subcommand))
         .await
         .unwrap();
@@ -485,12 +487,14 @@ pub async fn test_success_token_program_private_owned() {
     };
 
     // Create new token
-    let subcommand = TokenProgramSubcommand::CreateNewTokenPrivateOwned {
-        definition_addr: definition_addr.to_string(),
-        supply_addr: supply_addr.to_string(),
-        name: "A NAME".to_string(),
-        total_supply: 37,
-    };
+    let subcommand = TokenProgramSubcommand::Private(
+        TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
+            definition_addr: definition_addr.to_string(),
+            supply_addr: supply_addr.to_string(),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        },
+    );
 
     wallet::execute_subcommand(Command::TokenProgram(subcommand))
         .await
@@ -527,11 +531,12 @@ pub async fn test_success_token_program_private_owned() {
     assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
 
     // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-    let subcommand = TokenProgramSubcommand::TransferTokenPrivateOwnedNotInitialized {
-        sender_addr: supply_addr.to_string(),
-        recipient_addr: recipient_addr.to_string(),
-        balance_to_move: 7,
-    };
+    let subcommand =
+        TokenProgramSubcommand::Private(TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
+            sender_addr: supply_addr.to_string(),
+            recipient_addr: recipient_addr.to_string(),
+            balance_to_move: 7,
+        });
 
     wallet::execute_subcommand(Command::TokenProgram(subcommand))
         .await
@@ -554,11 +559,12 @@ pub async fn test_success_token_program_private_owned() {
     assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
 
     // Transfer additional 7 tokens from `supply_acc` to the account at address `recipient_addr`
-    let subcommand = TokenProgramSubcommand::TransferTokenPrivateOwnedAlreadyInitialized {
-        sender_addr: supply_addr.to_string(),
-        recipient_addr: recipient_addr.to_string(),
-        balance_to_move: 7,
-    };
+    let subcommand =
+        TokenProgramSubcommand::Private(TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
+            sender_addr: supply_addr.to_string(),
+            recipient_addr: recipient_addr.to_string(),
+            balance_to_move: 7,
+        });
 
     wallet::execute_subcommand(Command::TokenProgram(subcommand))
         .await
@@ -614,12 +620,14 @@ pub async fn test_success_token_program_private_claiming_path() {
     };
 
     // Create new token
-    let subcommand = TokenProgramSubcommand::CreateNewTokenPrivateOwned {
-        definition_addr: definition_addr.to_string(),
-        supply_addr: supply_addr.to_string(),
-        name: "A NAME".to_string(),
-        total_supply: 37,
-    };
+    let subcommand = TokenProgramSubcommand::Private(
+        TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
+            definition_addr: definition_addr.to_string(),
+            supply_addr: supply_addr.to_string(),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        },
+    );
 
     wallet::execute_subcommand(Command::TokenProgram(subcommand))
         .await
@@ -662,12 +670,14 @@ pub async fn test_success_token_program_private_claiming_path() {
         .unwrap();
 
     // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-    let subcommand = TokenProgramSubcommand::TransferTokenPrivateForeign {
-        sender_addr: supply_addr.to_string(),
-        recipient_npk: hex::encode(recipient_keys.nullifer_public_key.0),
-        recipient_ipk: hex::encode(recipient_keys.incoming_viewing_public_key.0.clone()),
-        balance_to_move: 7,
-    };
+    let subcommand = TokenProgramSubcommand::Private(
+        TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
+            sender_addr: supply_addr.to_string(),
+            recipient_npk: hex::encode(recipient_keys.nullifer_public_key.0),
+            recipient_ipk: hex::encode(recipient_keys.incoming_viewing_public_key.0.clone()),
+            balance_to_move: 7,
+        },
+    );
 
     let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
         wallet::execute_subcommand(Command::TokenProgram(subcommand))
