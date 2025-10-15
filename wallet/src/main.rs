@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Parser;
 use tokio::runtime::Builder;
-use wallet::{Args, execute_subcommand};
+use wallet::{Args, execute_continious_run, execute_subcommand};
 
 pub const NUM_THREADS: usize = 2;
 
@@ -17,7 +17,13 @@ fn main() -> Result<()> {
     env_logger::init();
 
     runtime.block_on(async move {
-        execute_subcommand(args.command).await.unwrap();
+        if let Some(command) = args.command {
+            execute_subcommand(command).await.unwrap();
+        } else if args.continious_run {
+            execute_continious_run().await.unwrap();
+        } else {
+            println!("NOTHING TO DO");
+        }
     });
 
     Ok(())

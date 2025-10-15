@@ -2,6 +2,7 @@ use std::{fs::File, io::Write, path::PathBuf, sync::Arc};
 
 use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use common::{
+    block::HashableBlockData,
     sequencer_client::SequencerClient,
     transaction::{EncodedTransaction, NSSATransaction},
 };
@@ -10,7 +11,7 @@ use anyhow::Result;
 use chain_storage::WalletChainStore;
 use config::WalletConfig;
 use log::info;
-use nssa::{Account, Address};
+use nssa::{Account, Address, privacy_preserving_transaction::message::EncryptedAccountData};
 
 use clap::{Parser, Subcommand};
 use nssa_core::Commitment;
@@ -202,9 +203,12 @@ pub enum Command {
 #[derive(Parser, Debug)]
 #[clap(version, about)]
 pub struct Args {
+    /// Continious run flag
+    #[arg(short, long)]
+    pub continious_run: bool,
     /// Wallet command
     #[command(subcommand)]
-    pub command: Command,
+    pub command: Option<Command>,
 }
 
 #[derive(Debug, Clone)]
@@ -239,4 +243,89 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
     };
 
     Ok(subcommand_ret)
+}
+
+pub async fn execute_continious_run() -> Result<()> {
+    let config = fetch_config()?;
+    let seq_client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
+    let mut wallet_core = WalletCore::start_from_config_update_chain(config.clone())?;
+
+    let mut latest_block_num = seq_client.get_last_block().await?.last_block;
+    let mut curr_last_block = latest_block_num;
+
+    loop {
+        for block_id in curr_last_block..(latest_block_num + 1) {
+            let block = borsh::from_slice::<HashableBlockData>(
+                &seq_client.get_block(block_id).await?.block,
+            )?;
+
+            for tx in block.transactions {
+                let nssa_tx = NSSATransaction::try_from(&tx)?;
+
+                if let NSSATransaction::PrivacyPreserving(tx) = nssa_tx {
+                    let mut affected_accounts = vec![];
+
+                    for (acc_addr, (key_chain, _)) in
+                        &wallet_core.storage.user_data.user_private_accounts
+                    {
+                        let view_tag = EncryptedAccountData::compute_view_tag(
+                            key_chain.nullifer_public_key.clone(),
+                            key_chain.incoming_viewing_public_key.clone(),
+                        );
+
+                        for (ciph_id, encrypted_data) in tx
+                            .message()
+                            .encrypted_private_post_states
+                            .iter()
+                            .enumerate()
+                        {
+                            if encrypted_data.view_tag == view_tag {
+                                let ciphertext = &encrypted_data.ciphertext;
+                                let commitment = &tx.message.new_commitments[ciph_id];
+                                let shared_secret = key_chain
+                                    .calculate_shared_secret_receiver(encrypted_data.epk.clone());
+
+                                let res_acc = nssa_core::EncryptionScheme::decrypt(
+                                    ciphertext,
+                                    &shared_secret,
+                                    commitment,
+                                    ciph_id as u32,
+                                );
+
+                                if let Some(res_acc) = res_acc {
+                                    println!(
+                                        "Received new account for addr {acc_addr:#?} with account object {res_acc:#?}"
+                                    );
+
+                                    affected_accounts.push((*acc_addr, res_acc));
+                                }
+                            }
+                        }
+                    }
+
+                    for (affected_addr, new_acc) in affected_accounts {
+                        wallet_core
+                            .storage
+                            .insert_private_account_data(affected_addr, new_acc);
+                    }
+                }
+            }
+
+            wallet_core.store_persistent_accounts()?;
+
+            println!(
+                "Block at id {block_id} with timestamp {} parsed",
+                block.timestamp
+            );
+        }
+
+        curr_last_block = latest_block_num + 1;
+
+        tokio::time::sleep(std::time::Duration::from_millis(
+            config.seq_poll_timeout_millis,
+        ))
+        .await;
+
+        latest_block_num = seq_client.get_last_block().await?.last_block;
+    }
 }
