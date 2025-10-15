@@ -98,6 +98,7 @@ impl SequencerCore {
                     Err(TransactionMalformationErrorKind::InvalidSignature)
                 }
             }
+            NSSATransaction::ProgramDeployment(program_deployment_transaction) => todo!(),
         }
     }
 
@@ -140,6 +141,12 @@ impl SequencerCore {
                 self.store
                     .state
                     .transition_from_privacy_preserving_transaction(tx)
+                    .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
+            }
+            NSSATransaction::ProgramDeployment(tx) => {
+                self.store
+                    .state
+                    .transition_from_program_deployment_transaction(tx)
                     .inspect_err(|err| warn!("Error at transition {err:#?}"))?;
             }
         }

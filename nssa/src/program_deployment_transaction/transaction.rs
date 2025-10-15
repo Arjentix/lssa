@@ -4,7 +4,7 @@ use crate::{
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ProgramDeploymentTransaction {
-    message: Message,
+    pub(crate) message: Message,
 }
 
 impl ProgramDeploymentTransaction {
