@@ -2,15 +2,12 @@
 
 use std::io::{Cursor, Read};
 
-use nssa_core::program::ProgramId;
-
 use crate::{
-    Address, ProgramDeploymentTransaction, PublicKey, PublicTransaction, Signature,
-    error::NssaError, program_deployment_transaction::Message,
+    ProgramDeploymentTransaction, error::NssaError, program_deployment_transaction::Message,
 };
 
-const MESSAGE_ENCODING_PREFIX_LEN: usize = 22;
-const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] = b"\x02/NSSA/v0.1/TxMessage/";
+const MESSAGE_ENCODING_PREFIX_LEN: usize = 32;
+const MESSAGE_ENCODING_PREFIX: &[u8; MESSAGE_ENCODING_PREFIX_LEN] = b"/NSSA/v0.2/TxMessage/Program/\x00\x00\x00";
 
 impl Message {
     /// Serializes a `Message` into bytes in the following layout:

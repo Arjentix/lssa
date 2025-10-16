@@ -8,6 +8,10 @@ use serde::Serialize;
 
 use crate::error::NssaError;
 
+/// Maximum number of cycles for a public execution.
+/// TODO: Make this variable when fees are implemented
+const MAX_NUM_CYCLES_PUBLIC_EXECUTION: u64 = 1024 * 1024 * 32; // 32M cycles
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Program {
     id: ProgramId,
@@ -46,6 +50,7 @@ impl Program {
     ) -> Result<Vec<Account>, NssaError> {
         // Write inputs to the program
         let mut env_builder = ExecutorEnv::builder();
+        env_builder.session_limit(Some(MAX_NUM_CYCLES_PUBLIC_EXECUTION));
         Self::write_inputs(pre_states, instruction_data, &mut env_builder)?;
         let env = env_builder.build().unwrap();
 
