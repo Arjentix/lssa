@@ -18,4 +18,4 @@ pub use public_transaction::PublicTransaction;
 pub use signature::PrivateKey;
 pub use signature::PublicKey;
 pub use signature::Signature;
-pub use state::V01State;
+pub use state::V02State;

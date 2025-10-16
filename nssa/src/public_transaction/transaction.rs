@@ -8,7 +8,7 @@ use nssa_core::{
 use sha2::{Digest, digest::FixedOutput};
 
 use crate::{
-    V01State,
+    V02State,
     error::NssaError,
     public_transaction::{Message, WitnessSet},
 };
@@ -52,7 +52,7 @@ impl PublicTransaction {
 
     pub(crate) fn validate_and_produce_public_state_diff(
         &self,
-        state: &V01State,
+        state: &V02State,
     ) -> Result<HashMap<Address, Account>, NssaError> {
         let message = self.message();
         let witness_set = self.witness_set();
@@ -123,7 +123,7 @@ pub mod tests {
     use sha2::{Digest, digest::FixedOutput};
 
     use crate::{
-        Address, PrivateKey, PublicKey, PublicTransaction, Signature, V01State,
+        Address, PrivateKey, PublicKey, PublicTransaction, Signature, V02State,
         error::NssaError,
         program::Program,
         public_transaction::{Message, WitnessSet},
@@ -137,10 +137,10 @@ pub mod tests {
         (key1, key2, addr1, addr2)
     }
 
-    fn state_for_tests() -> V01State {
+    fn state_for_tests() -> V02State {
         let (_, _, addr1, addr2) = keys_for_tests();
         let initial_data = [(addr1, 10000), (addr2, 20000)];
-        V01State::new_with_genesis_accounts(&initial_data, &[])
+        V02State::new_with_genesis_accounts(&initial_data, &[])
     }
 
     fn transaction_for_tests() -> PublicTransaction {

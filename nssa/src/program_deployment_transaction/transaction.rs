@@ -1,5 +1,5 @@
 use crate::{
-    V01State, error::NssaError, program::Program, program_deployment_transaction::message::Message,
+    V02State, error::NssaError, program::Program, program_deployment_transaction::message::Message,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,7 +14,7 @@ impl ProgramDeploymentTransaction {
 
     pub(crate) fn validate_and_produce_public_state_diff(
         &self,
-        state: &V01State,
+        state: &V02State,
     ) -> Result<Program, NssaError> {
         // TODO: remove clone
         let program = Program::new(self.message.bytecode.clone())?;
