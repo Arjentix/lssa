@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use sha2::{Digest, digest::FixedOutput};
 
-pub type TreeHashType = [u8; 32];
+pub type HashType = [u8; 32];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NSSATransaction {
@@ -72,11 +72,11 @@ impl TryFrom<&EncodedTransaction> for NSSATransaction {
 
 impl EncodedTransaction {
     /// Computes and returns the SHA-256 hash of the JSON-serialized representation of `self`.
-    pub fn hash(&self) -> TreeHashType {
+    pub fn hash(&self) -> HashType {
         let bytes_to_hash = borsh::to_vec(&self).unwrap();
         let mut hasher = sha2::Sha256::new();
         hasher.update(&bytes_to_hash);
-        TreeHashType::from(hasher.finalize_fixed())
+        HashType::from(hasher.finalize_fixed())
     }
 
     pub fn log(&self) {
