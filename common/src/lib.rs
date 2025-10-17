@@ -6,7 +6,6 @@ pub mod block;
 pub mod rpc_primitives;
 pub mod sequencer_client;
 pub mod transaction;
-pub mod utxo_commitment;
 
 //Module for tests utility functions
 pub mod test_utils;
