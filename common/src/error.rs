@@ -51,9 +51,3 @@ pub enum ExecutionFailureKind {
     InsufficientFundsError,
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum TransactionSignatureError {
-    #[error("invalid signature for transaction body")]
-    InvalidSignature,
-}
-
