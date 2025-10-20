@@ -18,7 +18,7 @@ use nssa_core::{Commitment, MembershipProof};
 use tokio::io::AsyncWriteExt;
 
 use crate::cli::{
-    WalletSubcommand, chain::ChainSubcommand,
+    WalletSubcommand, account::AccountSubcommand, chain::ChainSubcommand,
     native_token_transfer_program::NativeTokenTransferProgramSubcommand,
     pinata_program::PinataProgramSubcommand,
 };
@@ -193,6 +193,9 @@ pub enum Command {
     ///Chain command
     #[command(subcommand)]
     Chain(ChainSubcommand),
+    ///Chain command
+    #[command(subcommand)]
+    Account(AccountSubcommand),
     ///Pinata command
     #[command(subcommand)]
     PinataProgram(PinataProgramSubcommand),
@@ -233,6 +236,11 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
         }
         Command::Chain(chain_subcommand) => {
             chain_subcommand.handle_subcommand(&mut wallet_core).await?
+        }
+        Command::Account(account_subcommand) => {
+            account_subcommand
+                .handle_subcommand(&mut wallet_core)
+                .await?
         }
         Command::PinataProgram(pinata_subcommand) => {
             pinata_subcommand

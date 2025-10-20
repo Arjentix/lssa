@@ -2,6 +2,7 @@ use anyhow::Result;
 
 use crate::{SubcommandReturnValue, WalletCore};
 
+pub mod account;
 pub mod chain;
 pub mod native_token_transfer_program;
 pub mod pinata_program;

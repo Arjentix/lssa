@@ -21,7 +21,7 @@ pub enum PinataProgramSubcommand {
 pub enum PinataProgramSubcommandPublic {
     // TODO: Testnet only. Refactor to prevent compilation on mainnet.
     // Claim piñata prize
-    ClaimPinata {
+    Claim {
         ///pinata_addr - valid 32 byte hex string
         #[arg(long)]
         pinata_addr: String,
@@ -39,7 +39,7 @@ pub enum PinataProgramSubcommandPublic {
 pub enum PinataProgramSubcommandPrivate {
     // TODO: Testnet only. Refactor to prevent compilation on mainnet.
     // Claim piñata prize
-    ClaimPinataPrivateReceiverOwned {
+    ClaimPrivateOwned {
         ///pinata_addr - valid 32 byte hex string
         #[arg(long)]
         pinata_addr: String,
@@ -58,7 +58,7 @@ impl WalletSubcommand for PinataProgramSubcommandPublic {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            PinataProgramSubcommandPublic::ClaimPinata {
+            PinataProgramSubcommandPublic::Claim {
                 pinata_addr,
                 winner_addr,
                 solution,
@@ -84,7 +84,7 @@ impl WalletSubcommand for PinataProgramSubcommandPrivate {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            PinataProgramSubcommandPrivate::ClaimPinataPrivateReceiverOwned {
+            PinataProgramSubcommandPrivate::ClaimPrivateOwned {
                 pinata_addr,
                 winner_addr,
                 solution,

@@ -11,7 +11,7 @@ pub enum NativeTokenTransferProgramSubcommand {
     ///Send native token transfer from `from` to `to` for `amount`
     ///
     /// Public operation
-    SendNativeTokenTransferPublic {
+    Public {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -28,7 +28,7 @@ pub enum NativeTokenTransferProgramSubcommand {
     ///Send native token transfer from `from` to `to` for `amount`
     ///
     /// Deshielded operation
-    SendNativeTokenTransferDeshielded {
+    Deshielded {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -50,7 +50,7 @@ pub enum NativeTokenTransferProgramSubcommandShielded {
     ///Send native token transfer from `from` to `to` for `amount`
     ///
     /// Shielded operation
-    SendNativeTokenTransferShielded {
+    ShieldedOwned {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -64,7 +64,7 @@ pub enum NativeTokenTransferProgramSubcommandShielded {
     ///Send native token transfer from `from` to `to` for `amount`
     ///
     /// Shielded operation
-    SendNativeTokenTransferShieldedForeignAccount {
+    ShieldedForeign {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -86,7 +86,7 @@ pub enum NativeTokenTransferProgramSubcommandPrivate {
     ///Send native token transfer from `from` to `to` for `amount`
     ///
     /// Private operation
-    SendNativeTokenTransferPrivateOwnedAccount {
+    PrivateOwned {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -100,7 +100,7 @@ pub enum NativeTokenTransferProgramSubcommandPrivate {
     ///Send native token transfer from `from` to `to` for `amount`
     ///
     /// Private operation
-    SendNativeTokenTransferPrivateForeignAccount {
+    PrivateForeign {
         ///from - valid 32 byte hex string
         #[arg(long)]
         from: String,
@@ -122,84 +122,92 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandPrivate {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            NativeTokenTransferProgramSubcommandPrivate::SendNativeTokenTransferPrivateOwnedAccount { from, to, amount } => {
-            let from: Address = from.parse().unwrap();
-            let to: Address = to.parse().unwrap();
+            NativeTokenTransferProgramSubcommandPrivate::PrivateOwned { from, to, amount } => {
+                let from: Address = from.parse().unwrap();
+                let to: Address = to.parse().unwrap();
 
-            let to_initialization = wallet_core.check_private_account_initialized(&to).await?;
+                let to_initialization = wallet_core.check_private_account_initialized(&to).await?;
 
-            let (res, [secret_from, secret_to]) = if let Some(to_proof) = to_initialization {
-                wallet_core
-                .send_private_native_token_transfer_owned_account_already_initialized(from, to, amount, to_proof)
-                .await?
-            } else {
-                wallet_core
-                .send_private_native_token_transfer_owned_account_not_initialized(from, to, amount)
-                .await?
-            };
+                let (res, [secret_from, secret_to]) = if let Some(to_proof) = to_initialization {
+                    wallet_core
+                        .send_private_native_token_transfer_owned_account_already_initialized(
+                            from, to, amount, to_proof,
+                        )
+                        .await?
+                } else {
+                    wallet_core
+                        .send_private_native_token_transfer_owned_account_not_initialized(
+                            from, to, amount,
+                        )
+                        .await?
+                };
 
-            println!("Results of tx send is {res:#?}");
+                println!("Results of tx send is {res:#?}");
 
-            let tx_hash = res.tx_hash;
-            let transfer_tx = wallet_core
-                .poll_native_token_transfer(tx_hash.clone())
-                .await?;
+                let tx_hash = res.tx_hash;
+                let transfer_tx = wallet_core
+                    .poll_native_token_transfer(tx_hash.clone())
+                    .await?;
 
-            if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                let acc_decode_data = vec![(secret_from, from), (secret_to, to)];
+                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                    let acc_decode_data = vec![(secret_from, from), (secret_to, to)];
 
-                wallet_core
-                    .decode_insert_privacy_preserving_transaction_results(tx, &acc_decode_data)?;
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
+                }
+
+                let path = wallet_core.store_persistent_accounts().await?;
+
+                println!("Stored persistent accounts at {path:#?}");
+
+                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
+            NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
+                from,
+                to_npk,
+                to_ipk,
+                amount,
+            } => {
+                let from: Address = from.parse().unwrap();
+                let to_npk_res = hex::decode(to_npk)?;
+                let mut to_npk = [0; 32];
+                to_npk.copy_from_slice(&to_npk_res);
+                let to_npk = nssa_core::NullifierPublicKey(to_npk);
 
-            let path = wallet_core.store_persistent_accounts().await?;
+                let to_ipk_res = hex::decode(to_ipk)?;
+                let mut to_ipk = [0u8; 33];
+                to_ipk.copy_from_slice(&to_ipk_res);
+                let to_ipk =
+                    nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
 
-            println!("Stored persistent accounts at {path:#?}");
+                let (res, [secret_from, _]) = wallet_core
+                    .send_private_native_token_transfer_outer_account(from, to_npk, to_ipk, amount)
+                    .await?;
 
-            Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
-        }
-        NativeTokenTransferProgramSubcommandPrivate::SendNativeTokenTransferPrivateForeignAccount {
-            from,
-            to_npk,
-            to_ipk,
-            amount,
-        } => {
-            let from: Address = from.parse().unwrap();
-            let to_npk_res = hex::decode(to_npk)?;
-            let mut to_npk = [0; 32];
-            to_npk.copy_from_slice(&to_npk_res);
-            let to_npk = nssa_core::NullifierPublicKey(to_npk);
+                println!("Results of tx send is {res:#?}");
 
-            let to_ipk_res = hex::decode(to_ipk)?;
-            let mut to_ipk = [0u8; 33];
-            to_ipk.copy_from_slice(&to_ipk_res);
-            let to_ipk =
-                nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
+                let tx_hash = res.tx_hash;
+                let transfer_tx = wallet_core
+                    .poll_native_token_transfer(tx_hash.clone())
+                    .await?;
 
-            let (res, [secret_from, _]) = wallet_core
-                .send_private_native_token_transfer_outer_account(from, to_npk, to_ipk, amount)
-                .await?;
+                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                    let acc_decode_data = vec![(secret_from, from)];
 
-            println!("Results of tx send is {res:#?}");
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
+                }
 
-            let tx_hash = res.tx_hash;
-            let transfer_tx = wallet_core
-                .poll_native_token_transfer(tx_hash.clone())
-                .await?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
-            if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                let acc_decode_data = vec![(secret_from, from)];
+                println!("Stored persistent accounts at {path:#?}");
 
-                wallet_core
-                    .decode_insert_privacy_preserving_transaction_results(tx, &acc_decode_data)?;
+                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
-
-            let path = wallet_core.store_persistent_accounts().await?;
-
-            println!("Stored persistent accounts at {path:#?}");
-
-            Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
-        }
         }
     }
 }
@@ -210,75 +218,79 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommandShielded {
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            NativeTokenTransferProgramSubcommandShielded::SendNativeTokenTransferShielded { from, to, amount } => {
-            let from: Address = from.parse().unwrap();
-            let to: Address = to.parse().unwrap();
+            NativeTokenTransferProgramSubcommandShielded::ShieldedOwned { from, to, amount } => {
+                let from: Address = from.parse().unwrap();
+                let to: Address = to.parse().unwrap();
 
-            let to_initialization = wallet_core.check_private_account_initialized(&to).await?;
+                let to_initialization = wallet_core.check_private_account_initialized(&to).await?;
 
-            let (res, secret) = if let Some(to_proof) = to_initialization {
-                wallet_core
-                .send_shielded_native_token_transfer_already_initialized(from, to, amount, to_proof)
-                .await?
-            } else {
-                wallet_core
-                .send_shielded_native_token_transfer_not_initialized(from, to, amount)
-                .await?
-            };
+                let (res, secret) = if let Some(to_proof) = to_initialization {
+                    wallet_core
+                        .send_shielded_native_token_transfer_already_initialized(
+                            from, to, amount, to_proof,
+                        )
+                        .await?
+                } else {
+                    wallet_core
+                        .send_shielded_native_token_transfer_not_initialized(from, to, amount)
+                        .await?
+                };
 
-            println!("Results of tx send is {res:#?}");
+                println!("Results of tx send is {res:#?}");
 
-            let tx_hash = res.tx_hash;
-            let transfer_tx = wallet_core
-                .poll_native_token_transfer(tx_hash.clone())
-                .await?;
+                let tx_hash = res.tx_hash;
+                let transfer_tx = wallet_core
+                    .poll_native_token_transfer(tx_hash.clone())
+                    .await?;
 
-            if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
-                let acc_decode_data = vec![(secret, to)];
+                if let NSSATransaction::PrivacyPreserving(tx) = transfer_tx {
+                    let acc_decode_data = vec![(secret, to)];
 
-                wallet_core
-                    .decode_insert_privacy_preserving_transaction_results(tx, &acc_decode_data)?;
+                    wallet_core.decode_insert_privacy_preserving_transaction_results(
+                        tx,
+                        &acc_decode_data,
+                    )?;
+                }
+
+                let path = wallet_core.store_persistent_accounts().await?;
+
+                println!("Stored persistent accounts at {path:#?}");
+
+                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
+            NativeTokenTransferProgramSubcommandShielded::ShieldedForeign {
+                from,
+                to_npk,
+                to_ipk,
+                amount,
+            } => {
+                let from: Address = from.parse().unwrap();
 
-            let path = wallet_core.store_persistent_accounts().await?;
+                let to_npk_res = hex::decode(to_npk)?;
+                let mut to_npk = [0; 32];
+                to_npk.copy_from_slice(&to_npk_res);
+                let to_npk = nssa_core::NullifierPublicKey(to_npk);
 
-            println!("Stored persistent accounts at {path:#?}");
+                let to_ipk_res = hex::decode(to_ipk)?;
+                let mut to_ipk = [0u8; 33];
+                to_ipk.copy_from_slice(&to_ipk_res);
+                let to_ipk =
+                    nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
 
-            Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
-        }
-        NativeTokenTransferProgramSubcommandShielded::SendNativeTokenTransferShieldedForeignAccount {
-            from,
-            to_npk,
-            to_ipk,
-            amount,
-        } => {
-            let from: Address = from.parse().unwrap();
+                let (res, _) = wallet_core
+                    .send_shielded_native_token_transfer_outer_account(from, to_npk, to_ipk, amount)
+                    .await?;
 
-            let to_npk_res = hex::decode(to_npk)?;
-            let mut to_npk = [0; 32];
-            to_npk.copy_from_slice(&to_npk_res);
-            let to_npk = nssa_core::NullifierPublicKey(to_npk);
+                println!("Results of tx send is {res:#?}");
 
-            let to_ipk_res = hex::decode(to_ipk)?;
-            let mut to_ipk = [0u8; 33];
-            to_ipk.copy_from_slice(&to_ipk_res);
-            let to_ipk =
-                nssa_core::encryption::shared_key_derivation::Secp256k1Point(to_ipk.to_vec());
+                let tx_hash = res.tx_hash;
 
-            let (res, _) = wallet_core
-                .send_shielded_native_token_transfer_outer_account(from, to_npk, to_ipk, amount)
-                .await?;
+                let path = wallet_core.store_persistent_accounts().await?;
 
-            println!("Results of tx send is {res:#?}");
+                println!("Stored persistent accounts at {path:#?}");
 
-            let tx_hash = res.tx_hash;
-
-            let path = wallet_core.store_persistent_accounts().await?;
-
-            println!("Stored persistent accounts at {path:#?}");
-
-            Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
-        }
+                Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
+            }
         }
     }
 }
@@ -295,11 +307,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
             NativeTokenTransferProgramSubcommand::Shielded(shielded_subcommand) => {
                 shielded_subcommand.handle_subcommand(wallet_core).await
             }
-            NativeTokenTransferProgramSubcommand::SendNativeTokenTransferDeshielded {
-                from,
-                to,
-                amount,
-            } => {
+            NativeTokenTransferProgramSubcommand::Deshielded { from, to, amount } => {
                 let from: Address = from.parse().unwrap();
                 let to: Address = to.parse().unwrap();
 
@@ -329,11 +337,7 @@ impl WalletSubcommand for NativeTokenTransferProgramSubcommand {
 
                 Ok(SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash })
             }
-            NativeTokenTransferProgramSubcommand::SendNativeTokenTransferPublic {
-                from,
-                to,
-                amount,
-            } => {
+            NativeTokenTransferProgramSubcommand::Public { from, to, amount } => {
                 let from: Address = from.parse().unwrap();
                 let to: Address = to.parse().unwrap();
 

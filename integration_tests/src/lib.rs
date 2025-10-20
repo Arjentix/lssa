@@ -20,7 +20,7 @@ use tokio::task::JoinHandle;
 use wallet::{
     Command, SubcommandReturnValue, WalletCore,
     cli::{
-        chain::{ChainSubcommand, FetchSubcommand, RegisterSubcommand},
+        account::{AccountSubcommand, FetchSubcommand, RegisterSubcommand},
         native_token_transfer_program::{
             NativeTokenTransferProgramSubcommand, NativeTokenTransferProgramSubcommandPrivate,
             NativeTokenTransferProgramSubcommandShielded,
@@ -112,13 +112,11 @@ pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)
 
 pub async fn test_success() {
     info!("test_success");
-    let command = Command::Transfer(
-        NativeTokenTransferProgramSubcommand::SendNativeTokenTransferPublic {
-            from: ACC_SENDER.to_string(),
-            to: ACC_RECEIVER.to_string(),
-            amount: 100,
-        },
-    );
+    let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        from: ACC_SENDER.to_string(),
+        to: ACC_RECEIVER.to_string(),
+        amount: 100,
+    });
 
     let wallet_config = fetch_config().await.unwrap();
 
@@ -150,9 +148,7 @@ pub async fn test_success() {
 
 pub async fn test_success_move_to_another_account() {
     info!("test_success_move_to_another_account");
-    let command = Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
-    ));
+    let command = Command::Account(AccountSubcommand::Register(RegisterSubcommand::Public {}));
 
     let wallet_config = fetch_config().await.unwrap();
 
@@ -176,13 +172,11 @@ pub async fn test_success_move_to_another_account() {
         panic!("Failed to produce new account, not present in persistent accounts");
     }
 
-    let command = Command::Transfer(
-        NativeTokenTransferProgramSubcommand::SendNativeTokenTransferPublic {
-            from: ACC_SENDER.to_string(),
-            to: new_persistent_account_addr.clone(),
-            amount: 100,
-        },
-    );
+    let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        from: ACC_SENDER.to_string(),
+        to: new_persistent_account_addr.clone(),
+        amount: 100,
+    });
 
     wallet::execute_subcommand(command).await.unwrap();
 
@@ -210,13 +204,11 @@ pub async fn test_success_move_to_another_account() {
 
 pub async fn test_failure() {
     info!("test_failure");
-    let command = Command::Transfer(
-        NativeTokenTransferProgramSubcommand::SendNativeTokenTransferPublic {
-            from: ACC_SENDER.to_string(),
-            to: ACC_RECEIVER.to_string(),
-            amount: 1000000,
-        },
-    );
+    let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        from: ACC_SENDER.to_string(),
+        to: ACC_RECEIVER.to_string(),
+        amount: 1000000,
+    });
 
     let wallet_config = fetch_config().await.unwrap();
 
@@ -250,13 +242,11 @@ pub async fn test_failure() {
 
 pub async fn test_success_two_transactions() {
     info!("test_success_two_transactions");
-    let command = Command::Transfer(
-        NativeTokenTransferProgramSubcommand::SendNativeTokenTransferPublic {
-            from: ACC_SENDER.to_string(),
-            to: ACC_RECEIVER.to_string(),
-            amount: 100,
-        },
-    );
+    let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        from: ACC_SENDER.to_string(),
+        to: ACC_RECEIVER.to_string(),
+        amount: 100,
+    });
 
     let wallet_config = fetch_config().await.unwrap();
 
@@ -285,13 +275,11 @@ pub async fn test_success_two_transactions() {
 
     info!("First TX Success!");
 
-    let command = Command::Transfer(
-        NativeTokenTransferProgramSubcommand::SendNativeTokenTransferPublic {
-            from: ACC_SENDER.to_string(),
-            to: ACC_RECEIVER.to_string(),
-            amount: 100,
-        },
-    );
+    let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        from: ACC_SENDER.to_string(),
+        to: ACC_RECEIVER.to_string(),
+        amount: 100,
+    });
 
     wallet::execute_subcommand(command).await.unwrap();
 
@@ -343,20 +331,20 @@ pub async fn test_success_token_program() {
     let wallet_config = fetch_config().await.unwrap();
 
     // Create new account for the token definition
-    wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
+    wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Public {},
     )))
     .await
     .unwrap();
     // Create new account for the token supply holder
-    wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
+    wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Public {},
     )))
     .await
     .unwrap();
     // Create new account for receiving a token transaction
-    wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
+    wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Public {},
     )))
     .await
     .unwrap();
@@ -492,8 +480,8 @@ pub async fn test_success_token_program_private_owned() {
     // Create new account for the token definition (public)
     let SubcommandReturnValue::RegisterAccount {
         addr: definition_addr,
-    } = wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
+    } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Public {},
     )))
     .await
     .unwrap()
@@ -501,20 +489,18 @@ pub async fn test_success_token_program_private_owned() {
         panic!("invalid subcommand return value");
     };
     // Create new account for the token supply holder (private)
-    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
-        wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-            RegisterSubcommand::RegisterAccountPrivate {},
-        )))
-        .await
-        .unwrap()
-    else {
+    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } = wallet::execute_subcommand(
+        Command::Account(AccountSubcommand::Register(RegisterSubcommand::Private {})),
+    )
+    .await
+    .unwrap() else {
         panic!("invalid subcommand return value");
     };
     // Create new account for receiving a token transaction
     let SubcommandReturnValue::RegisterAccount {
         addr: recipient_addr,
-    } = wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPrivate {},
+    } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Private {},
     )))
     .await
     .unwrap()
@@ -637,8 +623,8 @@ pub async fn test_success_token_program_private_claiming_path() {
     // Create new account for the token definition (public)
     let SubcommandReturnValue::RegisterAccount {
         addr: definition_addr,
-    } = wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
+    } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Public {},
     )))
     .await
     .unwrap()
@@ -646,20 +632,18 @@ pub async fn test_success_token_program_private_claiming_path() {
         panic!("invalid subcommand return value");
     };
     // Create new account for the token supply holder (private)
-    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
-        wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-            RegisterSubcommand::RegisterAccountPrivate {},
-        )))
-        .await
-        .unwrap()
-    else {
+    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } = wallet::execute_subcommand(
+        Command::Account(AccountSubcommand::Register(RegisterSubcommand::Private {})),
+    )
+    .await
+    .unwrap() else {
         panic!("invalid subcommand return value");
     };
     // Create new account for receiving a token transaction
     let SubcommandReturnValue::RegisterAccount {
         addr: recipient_addr,
-    } = wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPrivate {},
+    } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Private {},
     )))
     .await
     .unwrap()
@@ -740,13 +724,11 @@ pub async fn test_success_token_program_private_claiming_path() {
     info!("Waiting for next block creation");
     tokio::time::sleep(Duration::from_secs(TIME_TO_WAIT_FOR_BLOCK_SECONDS)).await;
 
-    let command = Command::Chain(ChainSubcommand::Fetch(
-        FetchSubcommand::FetchPrivateAccount {
-            tx_hash,
-            acc_addr: recipient_addr.to_string(),
-            output_id: 1,
-        },
-    ));
+    let command = Command::Account(AccountSubcommand::Fetch(FetchSubcommand::PrivateAccount {
+        tx_hash,
+        acc_addr: recipient_addr.to_string(),
+        output_id: 1,
+    }));
 
     wallet::execute_subcommand(command).await.unwrap();
 
@@ -774,29 +756,27 @@ pub async fn test_success_token_program_shielded_owned() {
     // Create new account for the token definition (public)
     let SubcommandReturnValue::RegisterAccount {
         addr: definition_addr,
-    } = wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
+    } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Public {},
     )))
     .await
     .unwrap()
     else {
         panic!("invalid subcommand return value");
     };
-    // Create new account for the token supply holder (private)
-    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
-        wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-            RegisterSubcommand::RegisterAccountPublic {},
-        )))
-        .await
-        .unwrap()
-    else {
+    // Create new account for the token supply holder (public)
+    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } = wallet::execute_subcommand(
+        Command::Account(AccountSubcommand::Register(RegisterSubcommand::Public {})),
+    )
+    .await
+    .unwrap() else {
         panic!("invalid subcommand return value");
     };
     // Create new account for receiving a token transaction
     let SubcommandReturnValue::RegisterAccount {
         addr: recipient_addr,
-    } = wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPrivate {},
+    } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Private {},
     )))
     .await
     .unwrap()
@@ -899,8 +879,8 @@ pub async fn test_success_token_program_deshielded_owned() {
     // Create new account for the token definition (public)
     let SubcommandReturnValue::RegisterAccount {
         addr: definition_addr,
-    } = wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
+    } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Public {},
     )))
     .await
     .unwrap()
@@ -908,20 +888,18 @@ pub async fn test_success_token_program_deshielded_owned() {
         panic!("invalid subcommand return value");
     };
     // Create new account for the token supply holder (private)
-    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
-        wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-            RegisterSubcommand::RegisterAccountPrivate {},
-        )))
-        .await
-        .unwrap()
-    else {
+    let SubcommandReturnValue::RegisterAccount { addr: supply_addr } = wallet::execute_subcommand(
+        Command::Account(AccountSubcommand::Register(RegisterSubcommand::Private {})),
+    )
+    .await
+    .unwrap() else {
         panic!("invalid subcommand return value");
     };
     // Create new account for receiving a token transaction
     let SubcommandReturnValue::RegisterAccount {
         addr: recipient_addr,
-    } = wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPublic {},
+    } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
+        RegisterSubcommand::Public {},
     )))
     .await
     .unwrap()
@@ -1034,7 +1012,7 @@ pub async fn test_success_private_transfer_to_another_owned_account() {
     let to: Address = ACC_RECEIVER_PRIVATE.parse().unwrap();
 
     let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
-        NativeTokenTransferProgramSubcommandPrivate::SendNativeTokenTransferPrivateOwnedAccount {
+        NativeTokenTransferProgramSubcommandPrivate::PrivateOwned {
             from: from.to_string(),
             to: to.to_string(),
             amount: 100,
@@ -1071,7 +1049,7 @@ pub async fn test_success_private_transfer_to_another_foreign_account() {
     let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
 
     let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
-        NativeTokenTransferProgramSubcommandPrivate::SendNativeTokenTransferPrivateForeignAccount {
+        NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
             from: from.to_string(),
             to_npk: to_npk_string,
             to_ipk: hex::encode(to_ipk.0),
@@ -1113,9 +1091,7 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
     info!("test_success_private_transfer_to_another_owned_account_claiming_path");
     let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
 
-    let command = Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPrivate {},
-    ));
+    let command = Command::Account(AccountSubcommand::Register(RegisterSubcommand::Private {}));
 
     let sub_ret = wallet::execute_subcommand(command).await.unwrap();
     let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
@@ -1137,7 +1113,7 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
         .unwrap();
 
     let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
-        NativeTokenTransferProgramSubcommandPrivate::SendNativeTokenTransferPrivateForeignAccount {
+        NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
             from: from.to_string(),
             to_npk: hex::encode(to_keys.nullifer_public_key.0),
             to_ipk: hex::encode(to_keys.incoming_viewing_public_key.0),
@@ -1152,13 +1128,11 @@ pub async fn test_success_private_transfer_to_another_owned_account_claiming_pat
 
     let tx = fetch_privacy_preserving_tx(&seq_client, tx_hash.clone()).await;
 
-    let command = Command::Chain(ChainSubcommand::Fetch(
-        FetchSubcommand::FetchPrivateAccount {
-            tx_hash,
-            acc_addr: to_addr.to_string(),
-            output_id: 1,
-        },
-    ));
+    let command = Command::Account(AccountSubcommand::Fetch(FetchSubcommand::PrivateAccount {
+        tx_hash,
+        acc_addr: to_addr.to_string(),
+        output_id: 1,
+    }));
     wallet::execute_subcommand(command).await.unwrap();
     let wallet_storage = WalletCore::start_from_config_update_chain(wallet_config)
         .await
@@ -1187,9 +1161,7 @@ pub async fn test_success_private_transfer_to_another_owned_account_cont_run_pat
 
     let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
 
-    let command = Command::Chain(ChainSubcommand::Register(
-        RegisterSubcommand::RegisterAccountPrivate {},
-    ));
+    let command = Command::Account(AccountSubcommand::Register(RegisterSubcommand::Private {}));
 
     let sub_ret = wallet::execute_subcommand(command).await.unwrap();
     let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
@@ -1211,7 +1183,7 @@ pub async fn test_success_private_transfer_to_another_owned_account_cont_run_pat
         .unwrap();
 
     let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
-        NativeTokenTransferProgramSubcommandPrivate::SendNativeTokenTransferPrivateForeignAccount {
+        NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
             from: from.to_string(),
             to_npk: hex::encode(to_keys.nullifer_public_key.0),
             to_ipk: hex::encode(to_keys.incoming_viewing_public_key.0),
@@ -1257,13 +1229,11 @@ pub async fn test_success_deshielded_transfer_to_another_account() {
     info!("test_success_deshielded_transfer_to_another_account");
     let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
     let to: Address = ACC_RECEIVER.parse().unwrap();
-    let command = Command::Transfer(
-        NativeTokenTransferProgramSubcommand::SendNativeTokenTransferDeshielded {
-            from: from.to_string(),
-            to: to.to_string(),
-            amount: 100,
-        },
-    );
+    let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Deshielded {
+        from: from.to_string(),
+        to: to.to_string(),
+        amount: 100,
+    });
 
     let wallet_config = fetch_config().await.unwrap();
     let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
@@ -1305,7 +1275,7 @@ pub async fn test_success_shielded_transfer_to_another_owned_account() {
     let from: Address = ACC_SENDER.parse().unwrap();
     let to: Address = ACC_RECEIVER_PRIVATE.parse().unwrap();
     let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Shielded(
-        NativeTokenTransferProgramSubcommandShielded::SendNativeTokenTransferShielded {
+        NativeTokenTransferProgramSubcommandShielded::ShieldedOwned {
             from: from.to_string(),
             to: to.to_string(),
             amount: 100,
@@ -1348,12 +1318,13 @@ pub async fn test_success_shielded_transfer_to_another_foreign_account() {
     let from: Address = ACC_SENDER.parse().unwrap();
 
     let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Shielded(
-        NativeTokenTransferProgramSubcommandShielded::SendNativeTokenTransferShieldedForeignAccount {
-        from: from.to_string(),
-        to_npk: to_npk_string,
-        to_ipk: hex::encode(to_ipk.0),
-        amount: 100,
-    }));
+        NativeTokenTransferProgramSubcommandShielded::ShieldedForeign {
+            from: from.to_string(),
+            to_npk: to_npk_string,
+            to_ipk: hex::encode(to_ipk.0),
+            amount: 100,
+        },
+    ));
 
     let wallet_config = fetch_config().await.unwrap();
 
@@ -1390,7 +1361,7 @@ pub async fn test_pinata() {
     let pinata_prize = 150;
     let solution = 989106;
     let command = Command::PinataProgram(PinataProgramSubcommand::Public(
-        PinataProgramSubcommandPublic::ClaimPinata {
+        PinataProgramSubcommandPublic::Claim {
             pinata_addr: pinata_addr.clone(),
             winner_addr: ACC_SENDER.to_string(),
             solution,
@@ -1438,7 +1409,7 @@ pub async fn test_pinata_private_receiver() {
     let solution = 989106;
 
     let command = Command::PinataProgram(PinataProgramSubcommand::Private(
-        PinataProgramSubcommandPrivate::ClaimPinataPrivateReceiverOwned {
+        PinataProgramSubcommandPrivate::ClaimPrivateOwned {
             pinata_addr: pinata_addr.clone(),
             winner_addr: ACC_SENDER_PRIVATE.to_string(),
             solution,
@@ -1471,13 +1442,11 @@ pub async fn test_pinata_private_receiver() {
         .unwrap()
         .balance;
 
-    let command = Command::Chain(ChainSubcommand::Fetch(
-        FetchSubcommand::FetchPrivateAccount {
-            tx_hash: tx_hash.clone(),
-            acc_addr: ACC_SENDER_PRIVATE.to_string(),
-            output_id: 0,
-        },
-    ));
+    let command = Command::Account(AccountSubcommand::Fetch(FetchSubcommand::PrivateAccount {
+        tx_hash: tx_hash.clone(),
+        acc_addr: ACC_SENDER_PRIVATE.to_string(),
+        output_id: 0,
+    }));
     wallet::execute_subcommand(command).await.unwrap();
 
     let wallet_config = fetch_config().await.unwrap();
@@ -1503,18 +1472,16 @@ pub async fn test_pinata_private_receiver_new_account() {
     let solution = 989106;
 
     // Create new account for the token supply holder (private)
-    let SubcommandReturnValue::RegisterAccount { addr: winner_addr } =
-        wallet::execute_subcommand(Command::Chain(ChainSubcommand::Register(
-            RegisterSubcommand::RegisterAccountPrivate {},
-        )))
-        .await
-        .unwrap()
-    else {
+    let SubcommandReturnValue::RegisterAccount { addr: winner_addr } = wallet::execute_subcommand(
+        Command::Account(AccountSubcommand::Register(RegisterSubcommand::Private {})),
+    )
+    .await
+    .unwrap() else {
         panic!("invalid subcommand return value");
     };
 
     let command = Command::PinataProgram(PinataProgramSubcommand::Private(
-        PinataProgramSubcommandPrivate::ClaimPinataPrivateReceiverOwned {
+        PinataProgramSubcommandPrivate::ClaimPrivateOwned {
             pinata_addr: pinata_addr.clone(),
             winner_addr: winner_addr.to_string(),
             solution,

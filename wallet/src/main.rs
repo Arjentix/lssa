@@ -1,5 +1,5 @@
 use anyhow::Result;
-use clap::Parser;
+use clap::{CommandFactory, Parser};
 use tokio::runtime::Builder;
 use wallet::{Args, execute_continious_run, execute_subcommand};
 
@@ -22,7 +22,8 @@ fn main() -> Result<()> {
         } else if args.continious_run {
             execute_continious_run().await.unwrap();
         } else {
-            println!("NOTHING TO DO");
+            let help = Args::command().render_long_help();
+            println!("{help}");
         }
     });
 
