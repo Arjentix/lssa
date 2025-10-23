@@ -1,3 +1,4 @@
+use base58::ToBase58;
 use borsh::{BorshDeserialize, BorshSerialize};
 use k256::ecdsa::{Signature, SigningKey, VerifyingKey};
 use log::info;
@@ -125,7 +126,7 @@ impl From<OwnedUTXO> for OwnedUTXOForPublication {
     fn from(value: OwnedUTXO) -> Self {
         Self {
             hash: hex::encode(value.hash),
-            owner: hex::encode(value.owner),
+            owner: value.owner.to_base58(),
             amount: value.amount,
         }
     }
@@ -150,7 +151,7 @@ impl ActionData {
             ActionData::MintMoneyPublicTx(action) => {
                 format!(
                     "Account {:?} minted {:?} balance",
-                    hex::encode(action.acc),
+                    action.acc.to_base58(),
                     action.amount
                 )
             }
@@ -160,14 +161,14 @@ impl ActionData {
                     action
                         .receiver_data
                         .into_iter()
-                        .map(|(amount, rec)| (amount, hex::encode(rec)))
+                        .map(|(amount, rec)| (amount, rec.to_base58()))
                         .collect::<Vec<_>>()
                 )
             }
             ActionData::SendMoneyShieldedTx(action) => {
                 format!(
                     "Shielded send from {:?} for {:?} balance",
-                    hex::encode(action.acc_sender),
+                    action.acc_sender.to_base58(),
                     action.amount
                 )
             }

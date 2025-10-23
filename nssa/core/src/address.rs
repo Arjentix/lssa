@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "host")]
 use std::{fmt::Display, str::FromStr};
 
+#[cfg(feature = "host")]
+use base58::{FromBase58, ToBase58};
+
 #[derive(Serialize, Deserialize, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(
     any(feature = "host", test),
@@ -31,8 +34,8 @@ impl AsRef<[u8]> for Address {
 #[cfg(feature = "host")]
 #[derive(Debug, thiserror::Error)]
 pub enum AddressError {
-    #[error("invalid hex")]
-    InvalidHex(#[from] hex::FromHexError),
+    #[error("invalid base58")]
+    InvalidBase58(#[from] anyhow::Error),
     #[error("invalid length: expected 32 bytes, got {0}")]
     InvalidLength(usize),
 }
@@ -41,7 +44,9 @@ pub enum AddressError {
 impl FromStr for Address {
     type Err = AddressError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let bytes = hex::decode(s)?;
+        let bytes = s
+            .from_base58()
+            .map_err(|err| anyhow::anyhow!("Invalid base58 err {err:?}"))?;
         if bytes.len() != 32 {
             return Err(AddressError::InvalidLength(bytes.len()));
         }
@@ -54,7 +59,7 @@ impl FromStr for Address {
 #[cfg(feature = "host")]
 impl Display for Address {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", hex::encode(self.value))
+        write!(f, "{}", self.value.to_base58())
     }
 }
 
@@ -74,7 +79,7 @@ mod tests {
     fn parse_invalid_hex() {
         let hex_str = "zz".repeat(32); // invalid hex chars
         let result = hex_str.parse::<Address>().unwrap_err();
-        assert!(matches!(result, AddressError::InvalidHex(_)));
+        assert!(matches!(result, AddressError::InvalidBase58(_)));
     }
 
     #[test]

@@ -193,19 +193,19 @@ impl WalletCore {
 pub enum Command {
     ///Transfer command
     #[command(subcommand)]
-    Transfer(NativeTokenTransferProgramSubcommand),
+    AuthTransfer(NativeTokenTransferProgramSubcommand),
     ///Chain command
     #[command(subcommand)]
-    Chain(ChainSubcommand),
+    ChainInfo(ChainSubcommand),
     ///Chain command
     #[command(subcommand)]
     Account(AccountSubcommand),
     ///Pinata command
     #[command(subcommand)]
-    PinataProgram(PinataProgramSubcommand),
+    Pinata(PinataProgramSubcommand),
     ///Token command
     #[command(subcommand)]
-    TokenProgram(TokenProgramSubcommand),
+    Token(TokenProgramSubcommand),
     AuthenticatedTransferInitializePublicAccount {},
     // Check the wallet can connect to the node and builtin local programs
     // match the remote versions
@@ -237,12 +237,12 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
     let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
     let subcommand_ret = match command {
-        Command::Transfer(transfer_subcommand) => {
+        Command::AuthTransfer(transfer_subcommand) => {
             transfer_subcommand
                 .handle_subcommand(&mut wallet_core)
                 .await?
         }
-        Command::Chain(chain_subcommand) => {
+        Command::ChainInfo(chain_subcommand) => {
             chain_subcommand.handle_subcommand(&mut wallet_core).await?
         }
         Command::Account(account_subcommand) => {
@@ -250,7 +250,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
                 .handle_subcommand(&mut wallet_core)
                 .await?
         }
-        Command::PinataProgram(pinata_subcommand) => {
+        Command::Pinata(pinata_subcommand) => {
             pinata_subcommand
                 .handle_subcommand(&mut wallet_core)
                 .await?
@@ -304,7 +304,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 
             SubcommandReturnValue::RegisterAccount { addr }
         }
-        Command::TokenProgram(token_subcommand) => {
+        Command::Token(token_subcommand) => {
             token_subcommand.handle_subcommand(&mut wallet_core).await?
         }
     };

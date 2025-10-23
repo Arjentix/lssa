@@ -7,7 +7,7 @@ use nssa_core::{NullifierPublicKey, encryption::shared_key_derivation::Secp256k1
 use wallet::{
     Command, SubcommandReturnValue, WalletCore,
     cli::{
-        account::{AccountSubcommand, FetchSubcommand, RegisterSubcommand},
+        account::{AccountSubcommand, FetchSubcommand, NewSubcommand},
         native_token_transfer_program::{
             NativeTokenTransferProgramSubcommand, NativeTokenTransferProgramSubcommandPrivate,
             NativeTokenTransferProgramSubcommandShielded,
@@ -40,7 +40,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[test_suite_fn]
     pub async fn test_success() {
         info!("test_success");
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
             from: ACC_SENDER.to_string(),
             to: ACC_RECEIVER.to_string(),
             amount: 100,
@@ -77,7 +77,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[test_suite_fn]
     pub async fn test_success_move_to_another_account() {
         info!("test_success_move_to_another_account");
-        let command = Command::Account(AccountSubcommand::Register(RegisterSubcommand::Public {}));
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {}));
 
         let wallet_config = fetch_config().await.unwrap();
 
@@ -101,7 +101,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             panic!("Failed to produce new account, not present in persistent accounts");
         }
 
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
             from: ACC_SENDER.to_string(),
             to: new_persistent_account_addr.clone(),
             amount: 100,
@@ -134,7 +134,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[test_suite_fn]
     pub async fn test_failure() {
         info!("test_failure");
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
             from: ACC_SENDER.to_string(),
             to: ACC_RECEIVER.to_string(),
             amount: 1000000,
@@ -173,7 +173,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[test_suite_fn]
     pub async fn test_success_two_transactions() {
         info!("test_success_two_transactions");
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
             from: ACC_SENDER.to_string(),
             to: ACC_RECEIVER.to_string(),
             amount: 100,
@@ -206,7 +206,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         info!("First TX Success!");
 
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Public {
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
             from: ACC_SENDER.to_string(),
             to: ACC_RECEIVER.to_string(),
             amount: 100,
@@ -264,20 +264,20 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let wallet_config = fetch_config().await.unwrap();
 
         // Create new account for the token definition
-        wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Public {},
+        wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {},
         )))
         .await
         .unwrap();
         // Create new account for the token supply holder
-        wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Public {},
+        wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {},
         )))
         .await
         .unwrap();
         // Create new account for receiving a token transaction
-        wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Public {},
+        wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {},
         )))
         .await
         .unwrap();
@@ -311,7 +311,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
                 name: "A NAME".to_string(),
                 total_supply: 37,
             });
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
         info!("Waiting for next block creation");
@@ -365,7 +365,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
                 recipient_addr: recipient_addr.to_string(),
                 balance_to_move: 7,
             });
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
         info!("Waiting for next block creation");
@@ -416,8 +416,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Create new account for the token definition (public)
         let SubcommandReturnValue::RegisterAccount {
             addr: definition_addr,
-        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Public {},
+        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {},
         )))
         .await
         .unwrap()
@@ -426,8 +426,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
         // Create new account for the token supply holder (private)
         let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
-            wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-                RegisterSubcommand::Private {},
+            wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+                NewSubcommand::Private {},
             )))
             .await
             .unwrap()
@@ -437,8 +437,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Create new account for receiving a token transaction
         let SubcommandReturnValue::RegisterAccount {
             addr: recipient_addr,
-        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Private {},
+        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Private {},
         )))
         .await
         .unwrap()
@@ -456,7 +456,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -501,7 +501,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -532,7 +532,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -564,8 +564,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Create new account for the token definition (public)
         let SubcommandReturnValue::RegisterAccount {
             addr: definition_addr,
-        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Public {},
+        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {},
         )))
         .await
         .unwrap()
@@ -574,8 +574,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
         // Create new account for the token supply holder (private)
         let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
-            wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-                RegisterSubcommand::Private {},
+            wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+                NewSubcommand::Private {},
             )))
             .await
             .unwrap()
@@ -585,8 +585,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Create new account for receiving a token transaction
         let SubcommandReturnValue::RegisterAccount {
             addr: recipient_addr,
-        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Private {},
+        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Private {},
         )))
         .await
         .unwrap()
@@ -604,7 +604,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -657,7 +657,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         );
 
         let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
-            wallet::execute_subcommand(Command::TokenProgram(subcommand))
+            wallet::execute_subcommand(Command::Token(subcommand))
                 .await
                 .unwrap()
         else {
@@ -700,8 +700,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Create new account for the token definition (public)
         let SubcommandReturnValue::RegisterAccount {
             addr: definition_addr,
-        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Public {},
+        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {},
         )))
         .await
         .unwrap()
@@ -710,8 +710,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
         // Create new account for the token supply holder (public)
         let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
-            wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-                RegisterSubcommand::Public {},
+            wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+                NewSubcommand::Public {},
             )))
             .await
             .unwrap()
@@ -721,8 +721,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Create new account for receiving a token transaction
         let SubcommandReturnValue::RegisterAccount {
             addr: recipient_addr,
-        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Private {},
+        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Private {},
         )))
         .await
         .unwrap()
@@ -739,7 +739,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
                 total_supply: 37,
             });
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -774,7 +774,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -800,7 +800,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -827,8 +827,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Create new account for the token definition (public)
         let SubcommandReturnValue::RegisterAccount {
             addr: definition_addr,
-        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Public {},
+        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {},
         )))
         .await
         .unwrap()
@@ -837,8 +837,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
         // Create new account for the token supply holder (private)
         let SubcommandReturnValue::RegisterAccount { addr: supply_addr } =
-            wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-                RegisterSubcommand::Private {},
+            wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+                NewSubcommand::Private {},
             )))
             .await
             .unwrap()
@@ -848,8 +848,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         // Create new account for receiving a token transaction
         let SubcommandReturnValue::RegisterAccount {
             addr: recipient_addr,
-        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-            RegisterSubcommand::Public {},
+        } = wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+            NewSubcommand::Public {},
         )))
         .await
         .unwrap()
@@ -867,7 +867,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -912,7 +912,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -938,7 +938,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             },
         );
 
-        wallet::execute_subcommand(Command::TokenProgram(subcommand))
+        wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
 
@@ -962,7 +962,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
         let to: Address = ACC_RECEIVER_PRIVATE.parse().unwrap();
 
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Private(
             NativeTokenTransferProgramSubcommandPrivate::PrivateOwned {
                 from: from.to_string(),
                 to: to.to_string(),
@@ -1000,7 +1000,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to_npk_string = hex::encode(to_npk.0);
         let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
 
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Private(
             NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
                 from: from.to_string(),
                 to_npk: to_npk_string,
@@ -1044,7 +1044,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("test_success_private_transfer_to_another_owned_account_claiming_path");
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
 
-        let command = Command::Account(AccountSubcommand::Register(RegisterSubcommand::Private {}));
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {}));
 
         let sub_ret = wallet::execute_subcommand(command).await.unwrap();
         let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
@@ -1065,7 +1065,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .cloned()
             .unwrap();
 
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Private(
             NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
                 from: from.to_string(),
                 to_npk: hex::encode(to_keys.nullifer_public_key.0),
@@ -1115,7 +1115,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
 
-        let command = Command::Account(AccountSubcommand::Register(RegisterSubcommand::Private {}));
+        let command = Command::Account(AccountSubcommand::New(NewSubcommand::Private {}));
 
         let sub_ret = wallet::execute_subcommand(command).await.unwrap();
         let SubcommandReturnValue::RegisterAccount { addr: to_addr } = sub_ret else {
@@ -1136,7 +1136,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .cloned()
             .unwrap();
 
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Private(
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Private(
             NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
                 from: from.to_string(),
                 to_npk: hex::encode(to_keys.nullifer_public_key.0),
@@ -1184,7 +1184,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("test_success_deshielded_transfer_to_another_account");
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
         let to: Address = ACC_RECEIVER.parse().unwrap();
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Deshielded {
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Deshielded {
             from: from.to_string(),
             to: to.to_string(),
             amount: 100,
@@ -1230,7 +1230,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("test_success_shielded_transfer_to_another_owned_account");
         let from: Address = ACC_SENDER.parse().unwrap();
         let to: Address = ACC_RECEIVER_PRIVATE.parse().unwrap();
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Shielded(
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Shielded(
             NativeTokenTransferProgramSubcommandShielded::ShieldedOwned {
                 from: from.to_string(),
                 to: to.to_string(),
@@ -1274,7 +1274,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
         let from: Address = ACC_SENDER.parse().unwrap();
 
-        let command = Command::Transfer(NativeTokenTransferProgramSubcommand::Shielded(
+        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Shielded(
             NativeTokenTransferProgramSubcommandShielded::ShieldedForeign {
                 from: from.to_string(),
                 to_npk: to_npk_string,
@@ -1318,7 +1318,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let pinata_addr = "cafe".repeat(16);
         let pinata_prize = 150;
         let solution = 989106;
-        let command = Command::PinataProgram(PinataProgramSubcommand::Public(
+        let command = Command::Pinata(PinataProgramSubcommand::Public(
             PinataProgramSubcommandPublic::Claim {
                 pinata_addr: pinata_addr.clone(),
                 winner_addr: ACC_SENDER.to_string(),
@@ -1446,7 +1446,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let pinata_prize = 150;
         let solution = 989106;
 
-        let command = Command::PinataProgram(PinataProgramSubcommand::Private(
+        let command = Command::Pinata(PinataProgramSubcommand::Private(
             PinataProgramSubcommandPrivate::ClaimPrivateOwned {
                 pinata_addr: pinata_addr.clone(),
                 winner_addr: ACC_SENDER_PRIVATE.to_string(),
@@ -1512,8 +1512,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         // Create new account for the token supply holder (private)
         let SubcommandReturnValue::RegisterAccount { addr: winner_addr } =
-            wallet::execute_subcommand(Command::Account(AccountSubcommand::Register(
-                RegisterSubcommand::Private {},
+            wallet::execute_subcommand(Command::Account(AccountSubcommand::New(
+                NewSubcommand::Private {},
             )))
             .await
             .unwrap()
@@ -1521,7 +1521,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             panic!("invalid subcommand return value");
         };
 
-        let command = Command::PinataProgram(PinataProgramSubcommand::Private(
+        let command = Command::Pinata(PinataProgramSubcommand::Private(
             PinataProgramSubcommandPrivate::ClaimPrivateOwned {
                 pinata_addr: pinata_addr.clone(),
                 winner_addr: winner_addr.to_string(),

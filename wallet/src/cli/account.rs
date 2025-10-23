@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use anyhow::Result;
+use base58::ToBase58;
 use clap::Subcommand;
 use common::transaction::NSSATransaction;
 use nssa::Address;
@@ -18,9 +19,9 @@ pub enum AccountSubcommand {
     ///Fetch
     #[command(subcommand)]
     Fetch(FetchSubcommand),
-    ///Register
+    ///New
     #[command(subcommand)]
-    Register(RegisterSubcommand),
+    New(NewSubcommand),
 }
 
 ///Represents generic getter CLI subcommand
@@ -72,7 +73,7 @@ pub enum FetchSubcommand {
 
 ///Represents generic register CLI subcommand
 #[derive(Subcommand, Debug, Clone)]
-pub enum RegisterSubcommand {
+pub enum NewSubcommand {
     ///Register new public account
     Public {},
     ///Register new private account
@@ -190,13 +191,13 @@ impl WalletSubcommand for FetchSubcommand {
     }
 }
 
-impl WalletSubcommand for RegisterSubcommand {
+impl WalletSubcommand for NewSubcommand {
     async fn handle_subcommand(
         self,
         wallet_core: &mut WalletCore,
     ) -> Result<SubcommandReturnValue> {
         match self {
-            RegisterSubcommand::Public {} => {
+            NewSubcommand::Public {} => {
                 let addr = wallet_core.create_new_account_public();
 
                 println!("Generated new account with addr {addr}");
@@ -207,7 +208,7 @@ impl WalletSubcommand for RegisterSubcommand {
 
                 Ok(SubcommandReturnValue::RegisterAccount { addr })
             }
-            RegisterSubcommand::Private {} => {
+            NewSubcommand::Private {} => {
                 let addr = wallet_core.create_new_account_private();
 
                 let (key, _) = wallet_core
@@ -216,8 +217,8 @@ impl WalletSubcommand for RegisterSubcommand {
                     .get_private_account(&addr)
                     .unwrap();
 
-                println!("Generated new account with addr {addr}");
-                println!("With npk {}", hex::encode(&key.nullifer_public_key));
+                println!("Generated new account with addr {}", addr.to_bytes().to_base58());
+                println!("With npk {}", hex::encode(&key.nullifer_public_key.0));
                 println!(
                     "With ipk {}",
                     hex::encode(key.incoming_viewing_public_key.to_bytes())
@@ -245,8 +246,8 @@ impl WalletSubcommand for AccountSubcommand {
             AccountSubcommand::Fetch(fetch_subcommand) => {
                 fetch_subcommand.handle_subcommand(wallet_core).await
             }
-            AccountSubcommand::Register(register_subcommand) => {
-                register_subcommand.handle_subcommand(wallet_core).await
+            AccountSubcommand::New(new_subcommand) => {
+                new_subcommand.handle_subcommand(wallet_core).await
             }
         }
     }
