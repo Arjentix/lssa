@@ -8,7 +8,7 @@ use sequencer_core::config::AccountInitialData;
 use serde_json::Value;
 
 use common::{
-    TreeHashType,
+    HashType,
     block::HashableBlockData,
     rpc_primitives::{
         errors::RpcError,
@@ -239,7 +239,7 @@ impl JsonHandler {
         let get_transaction_req = GetTransactionByHashRequest::parse(Some(request.params))?;
         let bytes: Vec<u8> = hex::decode(get_transaction_req.hash)
             .map_err(|_| RpcError::invalid_params("invalid hex".to_string()))?;
-        let hash: TreeHashType = bytes
+        let hash: HashType = bytes
             .try_into()
             .map_err(|_| RpcError::invalid_params("invalid length".to_string()))?;
 
