@@ -42,6 +42,14 @@ pub const TIME_TO_WAIT_FOR_BLOCK_SECONDS: u64 = 12;
 
 pub const NSSA_PROGRAM_FOR_TEST_DATA_CHANGER: &[u8] = include_bytes!("data_changer.bin");
 
+fn make_public_account_input_from_str(addr: &str) -> String {
+    format!("Public/{addr:?}")
+}
+
+fn make_private_account_input_from_str(addr: &str) -> String {
+    format!("Private/{addr:?}")
+}
+
 #[allow(clippy::type_complexity)]
 pub async fn pre_test(
     home_dir: PathBuf,

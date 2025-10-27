@@ -22,11 +22,10 @@ use tokio::io::AsyncWriteExt;
 
 use crate::cli::{
     WalletSubcommand, account::AccountSubcommand, chain::ChainSubcommand,
-    native_token_transfer_program::NativeTokenTransferProgramSubcommand,
-    pinata_program::PinataProgramSubcommand,
+    native_token_transfer_program::AuthTransferSubcommand, pinata_program::PinataProgramSubcommand,
+    token_program::TokenProgramAgnosticSubcommand,
 };
 use crate::{
-    cli::token_program::TokenProgramSubcommand,
     helperfunctions::{
         fetch_config, fetch_persistent_accounts, get_home, produce_data_for_storage,
     },
@@ -193,7 +192,7 @@ impl WalletCore {
 pub enum Command {
     ///Transfer command
     #[command(subcommand)]
-    AuthTransfer(NativeTokenTransferProgramSubcommand),
+    AuthTransfer(AuthTransferSubcommand),
     ///Chain command
     #[command(subcommand)]
     ChainInfo(ChainSubcommand),
@@ -205,7 +204,7 @@ pub enum Command {
     Pinata(PinataProgramSubcommand),
     ///Token command
     #[command(subcommand)]
-    Token(TokenProgramSubcommand),
+    Token(TokenProgramAgnosticSubcommand),
     AuthenticatedTransferInitializePublicAccount {},
     // Check the wallet can connect to the node and builtin local programs
     // match the remote versions

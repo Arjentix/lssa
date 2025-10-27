@@ -82,6 +82,8 @@ pub enum AccountSubcommand {
     ///New
     #[command(subcommand)]
     New(NewSubcommand),
+    ///Sync private accounts
+    SyncPrivate {},
 }
 
 ///Represents generic getter CLI subcommand
@@ -213,7 +215,7 @@ impl WalletSubcommand for NewSubcommand {
                     "Generated new account with addr {}",
                     addr.to_bytes().to_base58()
                 );
-                println!("With npk {}", hex::encode(&key.nullifer_public_key.0));
+                println!("With npk {}", hex::encode(key.nullifer_public_key.0));
                 println!(
                     "With ipk {}",
                     hex::encode(key.incoming_viewing_public_key.to_bytes())
@@ -303,12 +305,12 @@ impl WalletSubcommand for AccountSubcommand {
                 let token_prog_id = Program::token().id();
 
                 let acc_view = match &account.program_owner {
-                    _ if &account.program_owner == &auth_tr_prog_id => {
+                    _ if account.program_owner == auth_tr_prog_id => {
                         let acc_view: AuthenticatedTransferAccountView = account.into();
 
                         serde_json::to_string(&acc_view)?
                     }
-                    _ if &account.program_owner == &token_prog_id => {
+                    _ if account.program_owner == token_prog_id => {
                         if let Some(token_def) = TokenDefinition::parse(&account.data) {
                             let acc_view: TokedDefinitionAccountView = token_def.into();
 
@@ -336,6 +338,9 @@ impl WalletSubcommand for AccountSubcommand {
             }
             AccountSubcommand::New(new_subcommand) => {
                 new_subcommand.handle_subcommand(wallet_core).await
+            }
+            AccountSubcommand::SyncPrivate {} => {
+                todo!();
             }
         }
     }

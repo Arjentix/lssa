@@ -3,7 +3,187 @@ use clap::Subcommand;
 use common::transaction::NSSATransaction;
 use nssa::Address;
 
-use crate::{SubcommandReturnValue, WalletCore, cli::WalletSubcommand};
+use crate::{
+    SubcommandReturnValue, WalletCore,
+    cli::WalletSubcommand,
+    helperfunctions::{AddressPrivacyKind, parse_addr_with_privacy_prefix},
+};
+
+///Represents generic CLI subcommand for a wallet working with token program
+#[derive(Subcommand, Debug, Clone)]
+pub enum TokenProgramAgnosticSubcommand {
+    New {
+        ///addr - valid 32 byte base58 string
+        #[arg(long)]
+        definition_addr: String,
+        ///addr - valid 32 byte base58 string
+        #[arg(long)]
+        supply_addr: String,
+        #[arg(short, long)]
+        name: String,
+        #[arg(short, long)]
+        total_supply: u128,
+    },
+    Send {
+        ///from - valid 32 byte base58 string
+        #[arg(long)]
+        from: String,
+        ///to - valid 32 byte base58 string
+        #[arg(long)]
+        to: Option<String>,
+        ///to_npk - valid 32 byte hex string
+        #[arg(long)]
+        to_npk: Option<String>,
+        ///to_ipk - valid 33 byte hex string
+        #[arg(long)]
+        to_ipk: Option<String>,
+        ///amount - amount of balance to move
+        #[arg(long)]
+        amount: u128,
+    },
+}
+
+impl WalletSubcommand for TokenProgramAgnosticSubcommand {
+    async fn handle_subcommand(
+        self,
+        wallet_core: &mut WalletCore,
+    ) -> Result<SubcommandReturnValue> {
+        match self {
+            TokenProgramAgnosticSubcommand::New {
+                definition_addr,
+                supply_addr,
+                name,
+                total_supply,
+            } => {
+                let (definition_addr, definition_addr_privacy) =
+                    parse_addr_with_privacy_prefix(&definition_addr)?;
+                let (supply_addr, supply_addr_privacy) =
+                    parse_addr_with_privacy_prefix(&supply_addr)?;
+
+                let underlying_subcommand = match (definition_addr_privacy, supply_addr_privacy) {
+                    (AddressPrivacyKind::Public, AddressPrivacyKind::Public) => {
+                        TokenProgramSubcommand::Public(
+                            TokenProgramSubcommandPublic::CreateNewToken {
+                                definition_addr: definition_addr.to_string(),
+                                supply_addr: supply_addr.to_string(),
+                                name,
+                                total_supply,
+                            },
+                        )
+                    }
+                    (AddressPrivacyKind::Public, AddressPrivacyKind::Private) => {
+                        TokenProgramSubcommand::Private(
+                            TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
+                                definition_addr: definition_addr.to_string(),
+                                supply_addr: supply_addr.to_string(),
+                                name,
+                                total_supply,
+                            },
+                        )
+                    }
+                    (AddressPrivacyKind::Private, AddressPrivacyKind::Private) => {
+                        todo!();
+                    }
+                    (AddressPrivacyKind::Private, AddressPrivacyKind::Public) => {
+                        todo!();
+                    }
+                };
+
+                underlying_subcommand.handle_subcommand(wallet_core).await
+            }
+            TokenProgramAgnosticSubcommand::Send {
+                from,
+                to,
+                to_npk,
+                to_ipk,
+                amount,
+            } => {
+                let underlying_subcommand = match (to, to_npk, to_ipk) {
+                    (None, None, None) => {
+                        anyhow::bail!(
+                            "Provide either account address of receiver or their public keys"
+                        );
+                    }
+                    (Some(_), Some(_), Some(_)) => {
+                        anyhow::bail!(
+                            "Provide only one variant: either account address of receiver or their public keys"
+                        );
+                    }
+                    (_, Some(_), None) | (_, None, Some(_)) => {
+                        anyhow::bail!("List of public keys is uncomplete");
+                    }
+                    (Some(to), None, None) => {
+                        let (from, from_privacy) = parse_addr_with_privacy_prefix(&from)?;
+                        let (to, to_privacy) = parse_addr_with_privacy_prefix(&to)?;
+
+                        match (from_privacy, to_privacy) {
+                            (AddressPrivacyKind::Public, AddressPrivacyKind::Public) => {
+                                TokenProgramSubcommand::Public(
+                                    TokenProgramSubcommandPublic::TransferToken {
+                                        sender_addr: from.to_string(),
+                                        recipient_addr: to.to_string(),
+                                        balance_to_move: amount,
+                                    },
+                                )
+                            }
+                            (AddressPrivacyKind::Private, AddressPrivacyKind::Private) => {
+                                TokenProgramSubcommand::Private(
+                                    TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
+                                        sender_addr: from.to_string(),
+                                        recipient_addr: to.to_string(),
+                                        balance_to_move: amount,
+                                    },
+                                )
+                            }
+                            (AddressPrivacyKind::Private, AddressPrivacyKind::Public) => {
+                                TokenProgramSubcommand::Deshielded(
+                                    TokenProgramSubcommandDeshielded::TransferTokenDeshielded {
+                                        sender_addr: from.to_string(),
+                                        recipient_addr: to.to_string(),
+                                        balance_to_move: amount,
+                                    },
+                                )
+                            }
+                            (AddressPrivacyKind::Public, AddressPrivacyKind::Private) => {
+                                TokenProgramSubcommand::Shielded(
+                                    TokenProgramSubcommandShielded::TransferTokenShieldedOwned {
+                                        sender_addr: from.to_string(),
+                                        recipient_addr: to.to_string(),
+                                        balance_to_move: amount,
+                                    },
+                                )
+                            }
+                        }
+                    }
+                    (None, Some(to_npk), Some(to_ipk)) => {
+                        let (from, from_privacy) = parse_addr_with_privacy_prefix(&from)?;
+
+                        match from_privacy {
+                            AddressPrivacyKind::Private => TokenProgramSubcommand::Private(
+                                TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
+                                    sender_addr: from.to_string(),
+                                    recipient_npk: to_npk,
+                                    recipient_ipk: to_ipk,
+                                    balance_to_move: amount,
+                                },
+                            ),
+                            AddressPrivacyKind::Public => TokenProgramSubcommand::Shielded(
+                                TokenProgramSubcommandShielded::TransferTokenShieldedForeign {
+                                    sender_addr: from.to_string(),
+                                    recipient_npk: to_npk,
+                                    recipient_ipk: to_ipk,
+                                    balance_to_move: amount,
+                                },
+                            ),
+                        }
+                    }
+                };
+
+                underlying_subcommand.handle_subcommand(wallet_core).await
+            }
+        }
+    }
+}
 
 ///Represents generic CLI subcommand for a wallet working with token_program
 #[derive(Subcommand, Debug, Clone)]

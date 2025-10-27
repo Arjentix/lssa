@@ -8,18 +8,11 @@ use wallet::{
     Command, SubcommandReturnValue, WalletCore,
     cli::{
         account::{AccountSubcommand, FetchSubcommand, NewSubcommand},
-        native_token_transfer_program::{
-            NativeTokenTransferProgramSubcommand, NativeTokenTransferProgramSubcommandPrivate,
-            NativeTokenTransferProgramSubcommandShielded,
-        },
+        native_token_transfer_program::AuthTransferSubcommand,
         pinata_program::{
             PinataProgramSubcommand, PinataProgramSubcommandPrivate, PinataProgramSubcommandPublic,
         },
-        token_program::{
-            TokenProgramSubcommand, TokenProgramSubcommandDeshielded,
-            TokenProgramSubcommandPrivate, TokenProgramSubcommandPublic,
-            TokenProgramSubcommandShielded,
-        },
+        token_program::TokenProgramAgnosticSubcommand,
     },
     config::PersistentAccountData,
     helperfunctions::{fetch_config, fetch_persistent_accounts},
@@ -30,7 +23,8 @@ use sequencer_core::sequencer_store::PINATA_BASE58;
 use crate::{
     ACC_RECEIVER, ACC_RECEIVER_PRIVATE, ACC_SENDER, ACC_SENDER_PRIVATE,
     NSSA_PROGRAM_FOR_TEST_DATA_CHANGER, TIME_TO_WAIT_FOR_BLOCK_SECONDS,
-    fetch_privacy_preserving_tx,
+    fetch_privacy_preserving_tx, make_private_account_input_from_str,
+    make_public_account_input_from_str,
 };
 use crate::{post_test, pre_test, verify_commitment_is_in_state};
 
@@ -42,9 +36,11 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[test_suite_fn]
     pub async fn test_success() {
         info!("test_success");
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
-            from: ACC_SENDER.to_string(),
-            to: ACC_RECEIVER.to_string(),
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(ACC_SENDER),
+            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+            to_npk: None,
+            to_ipk: None,
             amount: 100,
         });
 
@@ -103,9 +99,13 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             panic!("Failed to produce new account, not present in persistent accounts");
         }
 
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
-            from: ACC_SENDER.to_string(),
-            to: new_persistent_account_addr.clone(),
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(ACC_SENDER),
+            to: Some(make_public_account_input_from_str(
+                &new_persistent_account_addr,
+            )),
+            to_npk: None,
+            to_ipk: None,
             amount: 100,
         });
 
@@ -136,9 +136,11 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[test_suite_fn]
     pub async fn test_failure() {
         info!("test_failure");
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
-            from: ACC_SENDER.to_string(),
-            to: ACC_RECEIVER.to_string(),
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(ACC_SENDER),
+            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+            to_npk: None,
+            to_ipk: None,
             amount: 1000000,
         });
 
@@ -175,9 +177,11 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     #[test_suite_fn]
     pub async fn test_success_two_transactions() {
         info!("test_success_two_transactions");
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
-            from: ACC_SENDER.to_string(),
-            to: ACC_RECEIVER.to_string(),
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(ACC_SENDER),
+            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+            to_npk: None,
+            to_ipk: None,
             amount: 100,
         });
 
@@ -208,9 +212,11 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
         info!("First TX Success!");
 
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Public {
-            from: ACC_SENDER.to_string(),
-            to: ACC_RECEIVER.to_string(),
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(ACC_SENDER),
+            to: Some(make_public_account_input_from_str(ACC_RECEIVER)),
+            to_npk: None,
+            to_ipk: None,
             amount: 100,
         });
 
@@ -306,13 +312,12 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .expect("Failed to produce new account, not present in persistent accounts");
 
         // Create new token
-        let subcommand =
-            TokenProgramSubcommand::Public(TokenProgramSubcommandPublic::CreateNewToken {
-                definition_addr: definition_addr.to_string(),
-                supply_addr: supply_addr.to_string(),
-                name: "A NAME".to_string(),
-                total_supply: 37,
-            });
+        let subcommand = TokenProgramAgnosticSubcommand::New {
+            definition_addr: make_public_account_input_from_str(&definition_addr.to_string()),
+            supply_addr: make_public_account_input_from_str(&supply_addr.to_string()),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        };
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
@@ -361,12 +366,16 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         );
 
         // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-        let subcommand =
-            TokenProgramSubcommand::Public(TokenProgramSubcommandPublic::TransferToken {
-                sender_addr: supply_addr.to_string(),
-                recipient_addr: recipient_addr.to_string(),
-                balance_to_move: 7,
-            });
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_public_account_input_from_str(&supply_addr.to_string()),
+            to: Some(make_public_account_input_from_str(
+                &recipient_addr.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
+
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
             .unwrap();
@@ -449,14 +458,12 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         // Create new token
-        let subcommand = TokenProgramSubcommand::Private(
-            TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
-                definition_addr: definition_addr.to_string(),
-                supply_addr: supply_addr.to_string(),
-                name: "A NAME".to_string(),
-                total_supply: 37,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::New {
+            definition_addr: make_public_account_input_from_str(&definition_addr.to_string()),
+            supply_addr: make_private_account_input_from_str(&supply_addr.to_string()),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -495,13 +502,15 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
 
         // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-        let subcommand = TokenProgramSubcommand::Private(
-            TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
-                sender_addr: supply_addr.to_string(),
-                recipient_addr: recipient_addr.to_string(),
-                balance_to_move: 7,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_private_account_input_from_str(&supply_addr.to_string()),
+            to: Some(make_private_account_input_from_str(
+                &recipient_addr.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -526,13 +535,15 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
 
         // Transfer additional 7 tokens from `supply_acc` to the account at address `recipient_addr`
-        let subcommand = TokenProgramSubcommand::Private(
-            TokenProgramSubcommandPrivate::TransferTokenPrivateOwned {
-                sender_addr: supply_addr.to_string(),
-                recipient_addr: recipient_addr.to_string(),
-                balance_to_move: 7,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_private_account_input_from_str(&supply_addr.to_string()),
+            to: Some(make_private_account_input_from_str(
+                &recipient_addr.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -597,14 +608,12 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         // Create new token
-        let subcommand = TokenProgramSubcommand::Private(
-            TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
-                definition_addr: definition_addr.to_string(),
-                supply_addr: supply_addr.to_string(),
-                name: "A NAME".to_string(),
-                total_supply: 37,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::New {
+            definition_addr: make_public_account_input_from_str(&definition_addr.to_string()),
+            supply_addr: make_private_account_input_from_str(&supply_addr.to_string()),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -649,14 +658,15 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .unwrap();
 
         // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-        let subcommand = TokenProgramSubcommand::Private(
-            TokenProgramSubcommandPrivate::TransferTokenPrivateForeign {
-                sender_addr: supply_addr.to_string(),
-                recipient_npk: hex::encode(recipient_keys.nullifer_public_key.0),
-                recipient_ipk: hex::encode(recipient_keys.incoming_viewing_public_key.0.clone()),
-                balance_to_move: 7,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_private_account_input_from_str(&supply_addr.to_string()),
+            to: None,
+            to_npk: Some(hex::encode(recipient_keys.nullifer_public_key.0)),
+            to_ipk: Some(hex::encode(
+                recipient_keys.incoming_viewing_public_key.0.clone(),
+            )),
+            amount: 7,
+        };
 
         let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
             wallet::execute_subcommand(Command::Token(subcommand))
@@ -733,13 +743,12 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         // Create new token
-        let subcommand =
-            TokenProgramSubcommand::Public(TokenProgramSubcommandPublic::CreateNewToken {
-                definition_addr: definition_addr.to_string(),
-                supply_addr: supply_addr.to_string(),
-                name: "A NAME".to_string(),
-                total_supply: 37,
-            });
+        let subcommand = TokenProgramAgnosticSubcommand::New {
+            definition_addr: make_public_account_input_from_str(&definition_addr.to_string()),
+            supply_addr: make_public_account_input_from_str(&supply_addr.to_string()),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -768,13 +777,15 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         );
 
         // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-        let subcommand = TokenProgramSubcommand::Shielded(
-            TokenProgramSubcommandShielded::TransferTokenShieldedOwned {
-                sender_addr: supply_addr.to_string(),
-                recipient_addr: recipient_addr.to_string(),
-                balance_to_move: 7,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_public_account_input_from_str(&supply_addr.to_string()),
+            to: Some(make_private_account_input_from_str(
+                &recipient_addr.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -794,13 +805,15 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
 
         // Transfer additional 7 tokens from `supply_acc` to the account at address `recipient_addr`
-        let subcommand = TokenProgramSubcommand::Shielded(
-            TokenProgramSubcommandShielded::TransferTokenShieldedOwned {
-                sender_addr: supply_addr.to_string(),
-                recipient_addr: recipient_addr.to_string(),
-                balance_to_move: 7,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_public_account_input_from_str(&supply_addr.to_string()),
+            to: Some(make_private_account_input_from_str(
+                &recipient_addr.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -860,14 +873,12 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         };
 
         // Create new token
-        let subcommand = TokenProgramSubcommand::Private(
-            TokenProgramSubcommandPrivate::CreateNewTokenPrivateOwned {
-                definition_addr: definition_addr.to_string(),
-                supply_addr: supply_addr.to_string(),
-                name: "A NAME".to_string(),
-                total_supply: 37,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::New {
+            definition_addr: make_public_account_input_from_str(&definition_addr.to_string()),
+            supply_addr: make_private_account_input_from_str(&supply_addr.to_string()),
+            name: "A NAME".to_string(),
+            total_supply: 37,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -906,13 +917,15 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
 
         // Transfer 7 tokens from `supply_acc` to the account at address `recipient_addr`
-        let subcommand = TokenProgramSubcommand::Deshielded(
-            TokenProgramSubcommandDeshielded::TransferTokenDeshielded {
-                sender_addr: supply_addr.to_string(),
-                recipient_addr: recipient_addr.to_string(),
-                balance_to_move: 7,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_private_account_input_from_str(&supply_addr.to_string()),
+            to: Some(make_public_account_input_from_str(
+                &recipient_addr.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -932,13 +945,15 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
 
         // Transfer additional 7 tokens from `supply_acc` to the account at address `recipient_addr`
-        let subcommand = TokenProgramSubcommand::Deshielded(
-            TokenProgramSubcommandDeshielded::TransferTokenDeshielded {
-                sender_addr: supply_addr.to_string(),
-                recipient_addr: recipient_addr.to_string(),
-                balance_to_move: 7,
-            },
-        );
+        let subcommand = TokenProgramAgnosticSubcommand::Send {
+            from: make_private_account_input_from_str(&supply_addr.to_string()),
+            to: Some(make_public_account_input_from_str(
+                &recipient_addr.to_string(),
+            )),
+            to_npk: None,
+            to_ipk: None,
+            amount: 7,
+        };
 
         wallet::execute_subcommand(Command::Token(subcommand))
             .await
@@ -964,13 +979,13 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
         let to: Address = ACC_RECEIVER_PRIVATE.parse().unwrap();
 
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Private(
-            NativeTokenTransferProgramSubcommandPrivate::PrivateOwned {
-                from: from.to_string(),
-                to: to.to_string(),
-                amount: 100,
-            },
-        ));
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_private_account_input_from_str(&from.to_string()),
+            to: Some(make_private_account_input_from_str(&to.to_string())),
+            to_npk: None,
+            to_ipk: None,
+            amount: 100,
+        });
 
         wallet::execute_subcommand(command).await.unwrap();
 
@@ -1002,14 +1017,13 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to_npk_string = hex::encode(to_npk.0);
         let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
 
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Private(
-            NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
-                from: from.to_string(),
-                to_npk: to_npk_string,
-                to_ipk: hex::encode(to_ipk.0),
-                amount: 100,
-            },
-        ));
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_private_account_input_from_str(&from.to_string()),
+            to: None,
+            to_npk: Some(to_npk_string),
+            to_ipk: Some(hex::encode(to_ipk.0)),
+            amount: 100,
+        });
 
         let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } =
             wallet::execute_subcommand(command).await.unwrap()
@@ -1067,14 +1081,13 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .cloned()
             .unwrap();
 
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Private(
-            NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
-                from: from.to_string(),
-                to_npk: hex::encode(to_keys.nullifer_public_key.0),
-                to_ipk: hex::encode(to_keys.incoming_viewing_public_key.0),
-                amount: 100,
-            },
-        ));
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_private_account_input_from_str(&from.to_string()),
+            to: None,
+            to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
+            to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+            amount: 100,
+        });
 
         let sub_ret = wallet::execute_subcommand(command).await.unwrap();
         let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } = sub_ret else {
@@ -1138,14 +1151,13 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .cloned()
             .unwrap();
 
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Private(
-            NativeTokenTransferProgramSubcommandPrivate::PrivateForeign {
-                from: from.to_string(),
-                to_npk: hex::encode(to_keys.nullifer_public_key.0),
-                to_ipk: hex::encode(to_keys.incoming_viewing_public_key.0),
-                amount: 100,
-            },
-        ));
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_private_account_input_from_str(&from.to_string()),
+            to: None,
+            to_npk: Some(hex::encode(to_keys.nullifer_public_key.0)),
+            to_ipk: Some(hex::encode(to_keys.incoming_viewing_public_key.0)),
+            amount: 100,
+        });
 
         let sub_ret = wallet::execute_subcommand(command).await.unwrap();
         let SubcommandReturnValue::PrivacyPreservingTransfer { tx_hash } = sub_ret else {
@@ -1186,9 +1198,12 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("test_success_deshielded_transfer_to_another_account");
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
         let to: Address = ACC_RECEIVER.parse().unwrap();
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Deshielded {
-            from: from.to_string(),
-            to: to.to_string(),
+
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_private_account_input_from_str(&from.to_string()),
+            to: Some(make_public_account_input_from_str(&to.to_string())),
+            to_npk: None,
+            to_ipk: None,
             amount: 100,
         });
 
@@ -1232,13 +1247,14 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("test_success_shielded_transfer_to_another_owned_account");
         let from: Address = ACC_SENDER.parse().unwrap();
         let to: Address = ACC_RECEIVER_PRIVATE.parse().unwrap();
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Shielded(
-            NativeTokenTransferProgramSubcommandShielded::ShieldedOwned {
-                from: from.to_string(),
-                to: to.to_string(),
-                amount: 100,
-            },
-        ));
+
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(&from.to_string()),
+            to: Some(make_private_account_input_from_str(&to.to_string())),
+            to_npk: None,
+            to_ipk: None,
+            amount: 100,
+        });
 
         let wallet_config = fetch_config().await.unwrap();
         let seq_client = SequencerClient::new(wallet_config.sequencer_addr.clone()).unwrap();
@@ -1276,14 +1292,13 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         let to_ipk = Secp256k1Point::from_scalar(to_npk.0);
         let from: Address = ACC_SENDER.parse().unwrap();
 
-        let command = Command::AuthTransfer(NativeTokenTransferProgramSubcommand::Shielded(
-            NativeTokenTransferProgramSubcommandShielded::ShieldedForeign {
-                from: from.to_string(),
-                to_npk: to_npk_string,
-                to_ipk: hex::encode(to_ipk.0),
-                amount: 100,
-            },
-        ));
+        let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
+            from: make_public_account_input_from_str(&from.to_string()),
+            to: None,
+            to_npk: Some(to_npk_string),
+            to_ipk: Some(hex::encode(to_ipk.0)),
+            amount: 100,
+        });
 
         let wallet_config = fetch_config().await.unwrap();
 
