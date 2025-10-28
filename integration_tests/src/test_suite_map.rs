@@ -33,7 +33,7 @@ type TestFunction = fn(PathBuf) -> Pin<Box<dyn Future<Output = ()>>>;
 pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     let mut function_map: HashMap<String, TestFunction> = HashMap::new();
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success() {
         info!("test_success");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
@@ -72,7 +72,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_move_to_another_account() {
         info!("test_success_move_to_another_account");
         let command = Command::Account(AccountSubcommand::New(NewSubcommand::Public {}));
@@ -133,7 +133,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_failure() {
         info!("test_failure");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
@@ -174,7 +174,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_two_transactions() {
         info!("test_success_two_transactions");
         let command = Command::AuthTransfer(AuthTransferSubcommand::Send {
@@ -244,7 +244,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Second TX Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_get_account() {
         info!("test_get_account");
         let wallet_config = fetch_config().await.unwrap();
@@ -267,7 +267,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
     /// This test creates a new token using the token program. After creating the token, the test executes a
     /// token transfer to a new account.
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_token_program() {
         let wallet_config = fetch_config().await.unwrap();
 
@@ -420,7 +420,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
     /// This test creates a new private token using the token program. After creating the token, the test executes a
     /// private token transfer to a new account. All accounts are owned except definition.
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_token_program_private_owned() {
         let wallet_config = fetch_config().await.unwrap();
 
@@ -570,7 +570,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
     /// This test creates a new private token using the token program. After creating the token, the test executes a
     /// private token transfer to a new account.
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_token_program_private_claiming_path() {
         let wallet_config = fetch_config().await.unwrap();
 
@@ -705,7 +705,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
     /// This test creates a new public token using the token program. After creating the token, the test executes a
     /// shielded token transfer to a new account. All accounts are owned except definition.
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_token_program_shielded_owned() {
         let wallet_config = fetch_config().await.unwrap();
 
@@ -835,7 +835,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
     /// This test creates a new private token using the token program. After creating the token, the test executes a
     /// deshielded token transfer to a new account. All accounts are owned except definition.
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_token_program_deshielded_owned() {
         let wallet_config = fetch_config().await.unwrap();
 
@@ -973,7 +973,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert!(verify_commitment_is_in_state(new_commitment1, &seq_client).await);
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_private_transfer_to_another_owned_account() {
         info!("test_success_private_transfer_to_another_owned_account");
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
@@ -1009,7 +1009,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_private_transfer_to_another_foreign_account() {
         info!("test_success_private_transfer_to_another_foreign_account");
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
@@ -1055,7 +1055,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_private_transfer_to_another_owned_account_claiming_path() {
         info!("test_success_private_transfer_to_another_owned_account_claiming_path");
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
@@ -1123,7 +1123,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_private_transfer_to_another_owned_account_cont_run_path() {
         info!("test_success_private_transfer_to_another_owned_account_cont_run_path");
         let continious_run_handle = tokio::spawn(wallet::execute_continious_run());
@@ -1193,7 +1193,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_deshielded_transfer_to_another_account() {
         info!("test_success_deshielded_transfer_to_another_account");
         let from: Address = ACC_SENDER_PRIVATE.parse().unwrap();
@@ -1242,7 +1242,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_shielded_transfer_to_another_owned_account() {
         info!("test_success_shielded_transfer_to_another_owned_account");
         let from: Address = ACC_SENDER.parse().unwrap();
@@ -1284,7 +1284,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_success_shielded_transfer_to_another_foreign_account() {
         info!("test_success_shielded_transfer_to_another_foreign_account");
         let to_npk = NullifierPublicKey([42; 32]);
@@ -1329,7 +1329,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_pinata() {
         info!("test_pinata");
         let pinata_addr = PINATA_BASE58;
@@ -1377,7 +1377,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_program_deployment() {
         info!("test program deployment");
         let bytecode = NSSA_PROGRAM_FOR_TEST_DATA_CHANGER.to_vec();
@@ -1424,7 +1424,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_authenticated_transfer_initialize_function() {
         info!("test initialize account for authenticated transfer");
         let command = Command::AuthenticatedTransferInitializePublicAccount {};
@@ -1456,7 +1456,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_pinata_private_receiver() {
         info!("test_pinata_private_receiver");
         let pinata_addr = PINATA_BASE58;
@@ -1520,7 +1520,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         info!("Success!");
     }
 
-    #[test_suite_fn]
+    #[nssa_integration_test]
     pub async fn test_pinata_private_receiver_new_account() {
         info!("test_pinata_private_receiver");
         let pinata_addr = PINATA_BASE58;
