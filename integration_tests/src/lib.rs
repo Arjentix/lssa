@@ -16,7 +16,7 @@ use sequencer_runner::startup_sequencer;
 use tempfile::TempDir;
 use tokio::task::JoinHandle;
 
-use crate::test_suite_map::prepare_function_map;
+use crate::test_suite_map::{prepare_function_map, tps_test};
 
 #[macro_use]
 extern crate proc_macro_test_attribute;
@@ -99,7 +99,6 @@ pub async fn post_test(residual: (ServerHandle, JoinHandle<Result<()>>, TempDir)
     //So they are dropped and tempdirs will be dropped too,
 }
 
-
 pub async fn main_tests_runner() -> Result<()> {
     env_logger::init();
 
@@ -113,9 +112,12 @@ pub async fn main_tests_runner() -> Result<()> {
 
     match test_name.as_str() {
         "all" => {
+            // Tests that use default config
             for (_, fn_pointer) in function_map {
                 fn_pointer(home_dir.clone()).await;
             }
+            // Run TPS test with its own specific config
+            tps_test().await;
         }
         _ => {
             let fn_pointer = function_map.get(&test_name).expect("Unknown test name");
