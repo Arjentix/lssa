@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use nssa_core::{
     account::{Account, AccountWithMetadata},
     address::Address,
-    program::validate_execution,
+    program::{ChainedCall, validate_execution},
 };
 use sha2::{Digest, digest::FixedOutput};
 
@@ -18,6 +18,7 @@ pub struct PublicTransaction {
     message: Message,
     witness_set: WitnessSet,
 }
+const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
 impl PublicTransaction {
     pub fn new(message: Message, witness_set: WitnessSet) -> Self {
@@ -100,21 +101,65 @@ impl PublicTransaction {
             })
             .collect();
 
-        // Check the `program_id` corresponds to a deployed program
-        let Some(program) = state.programs().get(&message.program_id) else {
-            return Err(NssaError::InvalidInput("Unknown program".into()));
+        let mut state_diff: HashMap<Address, Account> = message
+            .addresses
+            .iter()
+            .cloned()
+            .zip(pre_states.iter().map(|pre| pre.account.clone()))
+            .collect();
+
+        let mut chained_call = ChainedCall {
+            program_id: message.program_id,
+            instruction_data: message.instruction_data.clone(),
+            account_indices: (0..pre_states.len()).collect(),
         };
 
-        // // Execute program
-        let post_states = program.execute(&pre_states, &message.instruction_data)?;
+        for _ in 0..MAX_NUMBER_CHAINED_CALLS {
+            // Check the `program_id` corresponds to a deployed program
+            let Some(program) = state.programs().get(&chained_call.program_id) else {
+                return Err(NssaError::InvalidInput("Unknown program".into()));
+            };
 
-        // Verify execution corresponds to a well-behaved program.
-        // See the # Programs section for the definition of the `validate_execution` method.
-        if !validate_execution(&pre_states, &post_states, message.program_id) {
-            return Err(NssaError::InvalidProgramBehavior);
+            let pre_states_chained_call = chained_call
+                .account_indices
+                .iter()
+                .map(|&i| {
+                    pre_states
+                        .get(i)
+                        .ok_or_else(|| NssaError::InvalidInput("Invalid account indices".into()))
+                        .cloned()
+                })
+                .collect::<Result<Vec<_>, NssaError>>()?;
+
+            let program_output =
+                program.execute(&pre_states_chained_call, &chained_call.instruction_data)?;
+
+            // Verify execution corresponds to a well-behaved program.
+            // See the # Programs section for the definition of the `validate_execution` method.
+            if validate_execution(
+                &program_output.pre_states,
+                &program_output.post_states,
+                message.program_id,
+            ) {
+                for (pre, post) in program_output
+                    .pre_states
+                    .iter()
+                    .zip(program_output.post_states)
+                {
+                    state_diff.insert(pre.account_id, post);
+                }
+            } else {
+                return Err(NssaError::InvalidProgramBehavior);
+            }
+
+            if let Some(next_chained_call) = program_output.chained_call {
+                chained_call = next_chained_call;
+            } else {
+                break;
+            };
         }
 
-        Ok(message.addresses.iter().cloned().zip(post_states).collect())
+        Ok(state_diff)
     }
 }
 
