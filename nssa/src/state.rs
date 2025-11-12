@@ -10,6 +10,8 @@ use nssa_core::{
 };
 use std::collections::{HashMap, HashSet};
 
+pub const MAX_NUMBER_CHAINED_CALLS: usize = 10;
+
 pub(crate) struct CommitmentSet {
     merkle_tree: MerkleTree,
     commitments: HashMap<Commitment, usize>,
@@ -251,6 +253,7 @@ pub mod tests {
         program::Program,
         public_transaction,
         signature::PrivateKey,
+        state::MAX_NUMBER_CHAINED_CALLS,
     };
 
     use nssa_core::{
@@ -2079,7 +2082,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_chained_call() {
+    fn test_chained_call_succeeds() {
         let program = Program::chain_caller();
         let key = PrivateKey::try_new([1; 32]).unwrap();
         let address = Address::from(&PublicKey::new_from_private_key(&key));
@@ -2091,8 +2094,8 @@ pub mod tests {
         let from_key = key;
         let to = Address::new([2; 32]);
         let amount: u128 = 37;
-        let instruction: (u128, ProgramId) =
-            (amount, Program::authenticated_transfer_program().id());
+        let instruction: (u128, ProgramId, u32) =
+            (amount, Program::authenticated_transfer_program().id(), 2);
 
         let expected_to_post = Account {
             program_owner: Program::chain_caller().id(),
@@ -2117,5 +2120,41 @@ pub mod tests {
         // The `chain_caller` program calls the program twice
         assert_eq!(from_post.balance, initial_balance - 2 * amount);
         assert_eq!(to_post, expected_to_post);
+    }
+
+    #[test]
+    fn test_execution_fails_if_chained_calls_exceeds_depth() {
+        let program = Program::chain_caller();
+        let key = PrivateKey::try_new([1; 32]).unwrap();
+        let address = Address::from(&PublicKey::new_from_private_key(&key));
+        let initial_balance = 100;
+        let initial_data = [(address, initial_balance)];
+        let mut state =
+            V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
+        let from = address;
+        let from_key = key;
+        let to = Address::new([2; 32]);
+        let amount: u128 = 0;
+        let instruction: (u128, ProgramId, u32) = (
+            amount,
+            Program::authenticated_transfer_program().id(),
+            MAX_NUMBER_CHAINED_CALLS as u32 + 1,
+        );
+
+        let message = public_transaction::Message::try_new(
+            program.id(),
+            vec![to, from], //The chain_caller program permutes the account order in the chain call
+            vec![0],
+            instruction,
+        )
+        .unwrap();
+        let witness_set = public_transaction::WitnessSet::for_message(&message, &[&from_key]);
+        let tx = PublicTransaction::new(message, witness_set);
+
+        let result = state.transition_from_public_transaction(&tx);
+        assert!(matches!(
+            result,
+            Err(NssaError::MaxChainedCallsDepthExceeded)
+        ));
     }
 }

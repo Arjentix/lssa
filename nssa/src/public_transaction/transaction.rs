@@ -11,6 +11,7 @@ use crate::{
     V02State,
     error::NssaError,
     public_transaction::{Message, WitnessSet},
+    state::MAX_NUMBER_CHAINED_CALLS,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -18,7 +19,6 @@ pub struct PublicTransaction {
     message: Message,
     witness_set: WitnessSet,
 }
-const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
 impl PublicTransaction {
     pub fn new(message: Message, witness_set: WitnessSet) -> Self {
@@ -183,7 +183,11 @@ impl PublicTransaction {
             };
         }
 
-        Ok(state_diff)
+        if chained_calls.is_empty() {
+            Ok(state_diff)
+        } else {
+            Err(NssaError::MaxChainedCallsDepthExceeded)
+        }
     }
 }
 
