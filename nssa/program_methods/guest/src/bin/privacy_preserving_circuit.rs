@@ -31,7 +31,7 @@ fn main() {
     } = program_output;
 
     // TODO: implement chained calls for privacy preserving transactions
-    if chained_call.is_some() {
+    if !chained_call.is_empty() {
         panic!("Privacy preserving transactions do not support yet chained calls.")
     }
 

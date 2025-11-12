@@ -2096,7 +2096,7 @@ pub mod tests {
 
         let expected_to_post = Account {
             program_owner: Program::chain_caller().id(),
-            balance: amount,
+            balance: amount * 2, // The `chain_caller` chains the program twice
             ..Account::default()
         };
 
@@ -2114,7 +2114,8 @@ pub mod tests {
 
         let from_post = state.get_account_by_address(&from);
         let to_post = state.get_account_by_address(&to);
-        assert_eq!(from_post.balance, initial_balance - amount);
+        // The `chain_caller` program calls the program twice
+        assert_eq!(from_post.balance, initial_balance - 2 * amount);
         assert_eq!(to_post, expected_to_post);
     }
 }

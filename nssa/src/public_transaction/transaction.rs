@@ -105,6 +105,7 @@ impl PublicTransaction {
 
         let mut program_id = message.program_id;
         let mut instruction_data = message.instruction_data.clone();
+        let mut chained_calls = Vec::new();
 
         for _i in 0..MAX_NUMBER_CHAINED_CALLS {
             // Check the `program_id` corresponds to a deployed program
@@ -147,7 +148,9 @@ impl PublicTransaction {
                 state_diff.insert(pre.account_id, post.clone());
             }
 
-            if let Some(next_chained_call) = program_output.chained_call {
+            chained_calls.extend_from_slice(&program_output.chained_call);
+
+            if let Some(next_chained_call) = chained_calls.pop() {
                 program_id = next_chained_call.program_id;
                 instruction_data = next_chained_call.instruction_data;
 
