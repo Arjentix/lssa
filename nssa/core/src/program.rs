@@ -17,7 +17,7 @@ pub struct ProgramInput<T> {
 pub struct ChainedCall {
     pub program_id: ProgramId,
     pub instruction_data: InstructionData,
-    pub account_indices: Vec<usize>,
+    pub pre_states: Vec<AccountWithMetadata>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]

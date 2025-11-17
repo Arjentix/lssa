@@ -115,11 +115,22 @@ impl PublicTransaction {
 
             let mut program_output = program.execute(&input_pre_states, &instruction_data)?;
 
-            // This check is equivalent to checking that the program output pre_states coinicide
-            // with the values in the public state or with any modifications to those values
-            // during the chain of calls.
-            if input_pre_states != program_output.pre_states {
-                return Err(NssaError::InvalidProgramBehavior);
+            for pre in program_output.pre_states.iter() {
+                let account_id = pre.account_id;
+                // Check that the program output pre_states coinicide with the values in the public
+                // state or with any modifications to those values during the chain of calls.
+                let expected_pre = state_diff
+                    .get(&account_id)
+                    .cloned()
+                    .unwrap_or_else(|| state.get_account_by_address(&account_id));
+                if pre.account != expected_pre {
+                    return Err(NssaError::InvalidProgramBehavior);
+                }
+
+                // Check that authorization flags are consistent with the provided ones
+                if pre.is_authorized && !signer_addresses.contains(&account_id) {
+                    return Err(NssaError::InvalidProgramBehavior);
+                }
             }
 
             // Verify execution corresponds to a well-behaved program.
@@ -153,31 +164,7 @@ impl PublicTransaction {
             if let Some(next_chained_call) = chained_calls.pop() {
                 program_id = next_chained_call.program_id;
                 instruction_data = next_chained_call.instruction_data;
-
-                // Build post states with metadata for next call
-                let mut post_states_with_metadata = Vec::new();
-                for (pre, post) in program_output
-                    .pre_states
-                    .iter()
-                    .zip(program_output.post_states)
-                {
-                    let mut post_with_metadata = pre.clone();
-                    post_with_metadata.account = post.clone();
-                    post_states_with_metadata.push(post_with_metadata);
-                }
-
-                input_pre_states = next_chained_call
-                    .account_indices
-                    .iter()
-                    .map(|&i| {
-                        post_states_with_metadata
-                            .get(i)
-                            .ok_or_else(|| {
-                                NssaError::InvalidInput("Invalid account indices".into())
-                            })
-                            .cloned()
-                    })
-                    .collect::<Result<Vec<_>, NssaError>>()?;
+                input_pre_states = next_chained_call.pre_states;
             } else {
                 break;
             };

@@ -2085,27 +2085,26 @@ pub mod tests {
     fn test_chained_call_succeeds() {
         let program = Program::chain_caller();
         let key = PrivateKey::try_new([1; 32]).unwrap();
-        let address = Address::from(&PublicKey::new_from_private_key(&key));
+        let from_address = Address::from(&PublicKey::new_from_private_key(&key));
+        let to_address = Address::new([2; 32]);
         let initial_balance = 100;
-        let initial_data = [(address, initial_balance)];
+        let initial_data = [(from_address, initial_balance), (to_address, 0)];
         let mut state =
             V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
-        let from = address;
         let from_key = key;
-        let to = Address::new([2; 32]);
-        let amount: u128 = 37;
+        let amount: u128 = 0;
         let instruction: (u128, ProgramId, u32) =
             (amount, Program::authenticated_transfer_program().id(), 2);
 
         let expected_to_post = Account {
-            program_owner: Program::chain_caller().id(),
+            program_owner: Program::authenticated_transfer_program().id(),
             balance: amount * 2, // The `chain_caller` chains the program twice
             ..Account::default()
         };
 
         let message = public_transaction::Message::try_new(
             program.id(),
-            vec![to, from], //The chain_caller program permutes the account order in the chain call
+            vec![to_address, from_address], //The chain_caller program permutes the account order in the chain call
             vec![0],
             instruction,
         )
@@ -2115,8 +2114,8 @@ pub mod tests {
 
         state.transition_from_public_transaction(&tx).unwrap();
 
-        let from_post = state.get_account_by_address(&from);
-        let to_post = state.get_account_by_address(&to);
+        let from_post = state.get_account_by_address(&from_address);
+        let to_post = state.get_account_by_address(&to_address);
         // The `chain_caller` program calls the program twice
         assert_eq!(from_post.balance, initial_balance - 2 * amount);
         assert_eq!(to_post, expected_to_post);
@@ -2126,14 +2125,13 @@ pub mod tests {
     fn test_execution_fails_if_chained_calls_exceeds_depth() {
         let program = Program::chain_caller();
         let key = PrivateKey::try_new([1; 32]).unwrap();
-        let address = Address::from(&PublicKey::new_from_private_key(&key));
+        let from_address = Address::from(&PublicKey::new_from_private_key(&key));
+        let to_address = Address::new([2; 32]);
         let initial_balance = 100;
-        let initial_data = [(address, initial_balance)];
+        let initial_data = [(from_address, initial_balance), (to_address, 0)];
         let mut state =
             V02State::new_with_genesis_accounts(&initial_data, &[]).with_test_programs();
-        let from = address;
         let from_key = key;
-        let to = Address::new([2; 32]);
         let amount: u128 = 0;
         let instruction: (u128, ProgramId, u32) = (
             amount,
@@ -2143,7 +2141,7 @@ pub mod tests {
 
         let message = public_transaction::Message::try_new(
             program.id(),
-            vec![to, from], //The chain_caller program permutes the account order in the chain call
+            vec![to_address, from_address], //The chain_caller program permutes the account order in the chain call
             vec![0],
             instruction,
         )

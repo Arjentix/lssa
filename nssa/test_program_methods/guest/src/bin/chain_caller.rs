@@ -24,7 +24,7 @@ fn main() {
         ChainedCall {
             program_id,
             instruction_data: instruction_data.clone(),
-            account_indices: vec![0, 1],
+            pre_states: vec![receiver_pre.clone(), sender_pre.clone()], // <- Account order permutation here
         };
         num_chain_calls as usize - 1
     ];
@@ -32,7 +32,7 @@ fn main() {
     chained_call.push(ChainedCall {
         program_id,
         instruction_data,
-        account_indices: vec![1, 0], // <- Account order permutation here
+        pre_states: vec![receiver_pre.clone(), sender_pre.clone()], // <- Account order permutation here
     });
 
     write_nssa_outputs_with_chained_call(
