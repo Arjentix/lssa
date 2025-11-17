@@ -123,7 +123,9 @@ impl WalletSubcommand for ConfigSubcommand {
                     );
                 }
                 "seq_poll_max_blocks" => {
-                    println!("Sequencer client polling variable: max number of blocks to poll in parallel");
+                    println!(
+                        "Sequencer client polling variable: max number of blocks to poll in parallel"
+                    );
                 }
                 "seq_poll_max_retries" => {
                     println!(
