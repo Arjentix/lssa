@@ -67,16 +67,16 @@ impl JsonHandler {
         }
     }
 
+    /// Example of request processing
     #[allow(clippy::unused_async)]
-    ///Example of request processing
     async fn process_temp_hello(&self, request: Request) -> Result<Value, RpcErr> {
         let _hello_request = HelloRequest::parse(Some(request.params))?;
 
-        let helperstruct = HelloResponse {
+        let response = HelloResponse {
             greeting: HELLO_FROM_SEQUENCER.to_string(),
         };
 
-        respond(helperstruct)
+        respond(response)
     }
 
     async fn process_send_tx(&self, request: Request) -> Result<Value, RpcErr> {
@@ -90,12 +90,12 @@ impl JsonHandler {
             state.push_tx_into_mempool_pre_check(tx)?;
         }
 
-        let helperstruct = SendTxResponse {
+        let response = SendTxResponse {
             status: TRANSACTION_SUBMITTED.to_string(),
             tx_hash,
         };
 
-        respond(helperstruct)
+        respond(response)
     }
 
     async fn process_get_block_data(&self, request: Request) -> Result<Value, RpcErr> {
@@ -107,11 +107,11 @@ impl JsonHandler {
             state.block_store.get_block_at_id(get_block_req.block_id)?
         };
 
-        let helperstruct = GetBlockDataResponse {
+        let response = GetBlockDataResponse {
             block: borsh::to_vec(&HashableBlockData::from(block)).unwrap(),
         };
 
-        respond(helperstruct)
+        respond(response)
     }
 
     async fn process_get_genesis(&self, request: Request) -> Result<Value, RpcErr> {
@@ -123,9 +123,9 @@ impl JsonHandler {
             state.block_store.genesis_id
         };
 
-        let helperstruct = GetGenesisIdResponse { genesis_id };
+        let response = GetGenesisIdResponse { genesis_id };
 
-        respond(helperstruct)
+        respond(response)
     }
 
     async fn process_get_last_block(&self, request: Request) -> Result<Value, RpcErr> {
@@ -137,9 +137,9 @@ impl JsonHandler {
             state.chain_height
         };
 
-        let helperstruct = GetLastBlockResponse { last_block };
+        let response = GetLastBlockResponse { last_block };
 
-        respond(helperstruct)
+        respond(response)
     }
 
     /// Returns the initial accounts for testnet
@@ -177,9 +177,9 @@ impl JsonHandler {
             account.balance
         };
 
-        let helperstruct = GetAccountBalanceResponse { balance };
+        let response = GetAccountBalanceResponse { balance };
 
-        respond(helperstruct)
+        respond(response)
     }
 
     /// Returns the nonces of the accounts at the given addresses.
@@ -204,9 +204,9 @@ impl JsonHandler {
                 .collect()
         };
 
-        let helperstruct = GetAccountsNoncesResponse { nonces };
+        let response = GetAccountsNoncesResponse { nonces };
 
-        respond(helperstruct)
+        respond(response)
     }
 
     /// Returns account struct for given address.
@@ -225,9 +225,9 @@ impl JsonHandler {
             state.state.get_account_by_address(&address)
         };
 
-        let helperstruct = GetAccountResponse { account };
+        let response = GetAccountResponse { account };
 
-        respond(helperstruct)
+        respond(response)
     }
 
     /// Returns the transaction corresponding to the given hash, if it exists in the blockchain.
@@ -248,10 +248,10 @@ impl JsonHandler {
                 .map(|tx| borsh::to_vec(&tx).unwrap())
         };
         let base64_encoded = transaction.map(|tx| general_purpose::STANDARD.encode(tx));
-        let helperstruct = GetTransactionByHashResponse {
+        let response = GetTransactionByHashResponse {
             transaction: base64_encoded,
         };
-        respond(helperstruct)
+        respond(response)
     }
 
     /// Returns the commitment proof, corresponding to commitment
@@ -264,8 +264,8 @@ impl JsonHandler {
                 .state
                 .get_proof_for_commitment(&get_proof_req.commitment)
         };
-        let helperstruct = GetProofForCommitmentResponse { membership_proof };
-        respond(helperstruct)
+        let response = GetProofForCommitmentResponse { membership_proof };
+        respond(response)
     }
 
     async fn process_get_program_ids(&self, request: Request) -> Result<Value, RpcErr> {
@@ -282,8 +282,8 @@ impl JsonHandler {
             "privacy_preserving_circuit".to_string(),
             nssa::PRIVACY_PRESERVING_CIRCUIT_ID,
         );
-        let helperstruct = GetProgramIdsResponse { program_ids };
-        respond(helperstruct)
+        let response = GetProgramIdsResponse { program_ids };
+        respond(response)
     }
 
     pub async fn process_request_internal(&self, request: Request) -> Result<Value, RpcErr> {
