@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     MembershipProof, NullifierPublicKey, NullifierSecretKey, PrivacyPreservingCircuitInput,
     PrivacyPreservingCircuitOutput, SharedSecretKey,
@@ -11,7 +12,7 @@ use crate::{error::NssaError, program::Program};
 use crate::program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID};
 
 /// Proof of the privacy preserving execution circuit
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Proof(pub(crate) Vec<u8>);
 
 /// Generates a proof of the execution of a NSSA program inside the privacy preserving execution

@@ -209,20 +209,11 @@ impl WitnessSet {
 
 impl PrivacyPreservingTransaction {
     pub fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = self.message().to_bytes();
-        bytes.extend_from_slice(&self.witness_set().to_bytes());
-        bytes
+        borsh::to_vec(&self).unwrap()
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, NssaError> {
-        let mut cursor = Cursor::new(bytes);
-        Self::from_cursor(&mut cursor)
-    }
-
-    pub fn from_cursor(cursor: &mut Cursor<&[u8]>) -> Result<Self, NssaError> {
-        let message = Message::from_cursor(cursor)?;
-        let witness_set = WitnessSet::from_cursor(cursor)?;
-        Ok(PrivacyPreservingTransaction::new(message, witness_set))
+        Ok(borsh::from_slice(bytes)?)
     }
 }
 

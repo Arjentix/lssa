@@ -1,11 +1,12 @@
 use crate::{address::Address, program::ProgramId};
+use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
 pub type Nonce = u128;
 pub type Data = Vec<u8>;
 
 /// Account to be used both in public and private contexts
-#[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Default, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 #[cfg_attr(any(feature = "host", test), derive(Debug))]
 pub struct Account {
     pub program_owner: ProgramId,

@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     Commitment, CommitmentSetDigest, Nullifier, NullifierPublicKey, PrivacyPreservingCircuitOutput,
     account::{Account, Nonce},
@@ -9,7 +10,7 @@ use crate::{Address, error::NssaError};
 
 pub type ViewTag = u8;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct EncryptedAccountData {
     pub ciphertext: Ciphertext,
     pub epk: EphemeralPublicKey,
@@ -42,7 +43,7 @@ impl EncryptedAccountData {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Message {
     pub(crate) public_addresses: Vec<Address>,
     pub(crate) nonces: Vec<Nonce>,
