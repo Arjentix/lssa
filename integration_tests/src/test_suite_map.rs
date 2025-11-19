@@ -1664,7 +1664,7 @@ pub async fn tps_test() {
     for (i, tx_hash) in tx_hashes.iter().enumerate() {
         loop {
             if now.elapsed().as_millis() > target_time.as_millis() {
-                panic!("TPS test failed by timout");
+                panic!("TPS test failed by timeout");
             }
 
             let tx_obj = seq_client
