@@ -1,4 +1,3 @@
-mod encoding;
 mod private_key;
 mod public_key;
 
