@@ -16,6 +16,7 @@ pub struct CommitmentsInitialData {
     pub account: nssa_core::account::Account,
 }
 
+// TODO: Provide default values
 #[derive(Clone, Serialize, Deserialize)]
 pub struct SequencerConfig {
     ///Home dir of sequencer storage
