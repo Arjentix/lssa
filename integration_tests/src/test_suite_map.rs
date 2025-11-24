@@ -1345,7 +1345,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
     #[nssa_integration_test]
     pub async fn test_pinata() {
-        info!("########## test_pinata ##########");
+        info!("########## test_pinata ###########");
         let pinata_addr = PINATA_BASE58;
         let pinata_prize = 150;
         let solution = 989106;
