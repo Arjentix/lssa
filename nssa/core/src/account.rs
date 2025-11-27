@@ -102,9 +102,8 @@ impl Display for AccountId {
 
 #[cfg(test)]
 mod tests {
-    use crate::program::DEFAULT_PROGRAM_ID;
-
     use super::*;
+    use crate::program::DEFAULT_PROGRAM_ID;
 
     #[test]
     fn test_zero_balance_account_data_creation() {

@@ -1,9 +1,8 @@
 use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::account::AccountId;
+use sha2::{Digest, Sha256};
 
 use crate::{PrivateKey, error::NssaError};
-
-use sha2::{Digest, Sha256};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize)]
 pub struct PublicKey([u8; 32]);

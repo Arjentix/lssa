@@ -1,5 +1,4 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use serde::{Deserialize, Serialize};
 
 use k256::{
     AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint,
@@ -8,6 +7,7 @@ use k256::{
         sec1::{FromEncodedPoint, ToEncodedPoint},
     },
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{SharedSecretKey, encryption::Scalar};
 

@@ -6,13 +6,12 @@ use nssa_core::{
     account::{Account, AccountWithMetadata},
 };
 
-use crate::error::NssaError;
-use crate::privacy_preserving_transaction::circuit::Proof;
-use crate::privacy_preserving_transaction::message::EncryptedAccountData;
-use crate::{AccountId, V02State};
-
-use super::message::Message;
-use super::witness_set::WitnessSet;
+use super::{message::Message, witness_set::WitnessSet};
+use crate::{
+    AccountId, V02State,
+    error::NssaError,
+    privacy_preserving_transaction::{circuit::Proof, message::EncryptedAccountData},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct PrivacyPreservingTransaction {
