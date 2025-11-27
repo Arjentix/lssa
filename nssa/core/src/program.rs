@@ -50,12 +50,12 @@ pub fn write_nssa_outputs(pre_states: Vec<AccountWithMetadata>, post_states: Vec
 pub fn write_nssa_outputs_with_chained_call(
     pre_states: Vec<AccountWithMetadata>,
     post_states: Vec<Account>,
-    chained_call: Vec<ChainedCall>,
+    chained_calls: Vec<ChainedCall>,
 ) {
     let output = ProgramOutput {
         pre_states,
         post_states,
-        chained_calls: chained_call,
+        chained_calls,
     };
     env::commit(&output);
 }
