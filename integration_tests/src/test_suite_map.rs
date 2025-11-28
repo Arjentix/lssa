@@ -1583,7 +1583,7 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
 
     #[nssa_integration_test]
     pub async fn test_pinata_private_receiver_new_account() {
-        info!("########## test_pinata_private_receiver ##########");
+        info!("########## test_pinata_private_receiver_new_account ##########");
         let pinata_account_id = PINATA_BASE58;
         let pinata_prize = 150;
         let solution = 989106;

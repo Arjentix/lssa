@@ -42,10 +42,13 @@ impl FromStr for ChainIndex {
 impl Display for ChainIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "/")?;
-        for cci in &self.0[..(self.0.len() - 1)] {
+        for cci in &self.0[..(self.0.len().saturating_sub(1))] {
             write!(f, "{cci}/")?;
         }
-        write!(f, "{}", self.0.last().unwrap())
+        if let Some(last) = self.0.last() {
+            write!(f, "{}", last)?;
+        }
+        Ok(())
     }
 }
 

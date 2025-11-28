@@ -136,7 +136,6 @@ impl WalletChainStore {
             .and_modify(|data| data.1 = account.clone());
 
         if matches!(entry, Entry::Vacant(_)) {
-        } else {
             self.user_data
                 .private_key_tree
                 .account_id_map
