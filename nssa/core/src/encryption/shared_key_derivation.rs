@@ -1,5 +1,4 @@
-use serde::{Deserialize, Serialize};
-
+use borsh::{BorshDeserialize, BorshSerialize};
 use k256::{
     AffinePoint, EncodedPoint, FieldBytes, ProjectivePoint,
     elliptic_curve::{
@@ -7,10 +6,11 @@ use k256::{
         sec1::{FromEncodedPoint, ToEncodedPoint},
     },
 };
+use serde::{Deserialize, Serialize};
 
 use crate::{SharedSecretKey, encryption::Scalar};
 
-#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Secp256k1Point(pub Vec<u8>);
 
 impl Secp256k1Point {

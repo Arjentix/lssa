@@ -1,6 +1,8 @@
+use borsh::{BorshDeserialize, BorshSerialize};
+
 use crate::{PrivateKey, PublicKey, Signature, public_transaction::Message};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct WitnessSet {
     pub(crate) signatures_and_public_keys: Vec<(Signature, PublicKey)>,
 }
@@ -39,9 +41,8 @@ impl WitnessSet {
 
 #[cfg(test)]
 mod tests {
-    use crate::Address;
-
     use super::*;
+    use crate::AccountId;
 
     #[test]
     fn test_for_message_constructor() {
@@ -49,8 +50,8 @@ mod tests {
         let key2 = PrivateKey::try_new([2; 32]).unwrap();
         let pubkey1 = PublicKey::new_from_private_key(&key1);
         let pubkey2 = PublicKey::new_from_private_key(&key2);
-        let addr1 = Address::from(&pubkey1);
-        let addr2 = Address::from(&pubkey2);
+        let addr1 = AccountId::from(&pubkey1);
+        let addr2 = AccountId::from(&pubkey2);
         let nonces = vec![1, 2];
         let instruction = vec![1, 2, 3, 4];
         let message = Message::try_new([0; 8], vec![addr1, addr2], nonces, instruction).unwrap();

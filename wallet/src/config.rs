@@ -3,32 +3,33 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialAccountDataPublic {
-    pub address: String,
+    pub account_id: String,
     pub pub_sign_key: nssa::PrivateKey,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistentAccountDataPublic {
-    pub address: nssa::Address,
+    pub account_id: nssa::AccountId,
     pub pub_sign_key: nssa::PrivateKey,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct InitialAccountDataPrivate {
-    pub address: String,
+    pub account_id: String,
     pub account: nssa_core::account::Account,
     pub key_chain: KeyChain,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistentAccountDataPrivate {
-    pub address: nssa::Address,
+    pub account_id: nssa::AccountId,
     pub account: nssa_core::account::Account,
     pub key_chain: KeyChain,
 }
 
-//Big difference in enum variants sizes
-//however it is improbable, that we will have that much accounts, that it will substantialy affect memory
+// Big difference in enum variants sizes
+// however it is improbable, that we will have that much accounts, that it will substantialy affect
+// memory
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum InitialAccountData {
@@ -36,8 +37,9 @@ pub enum InitialAccountData {
     Private(InitialAccountDataPrivate),
 }
 
-//Big difference in enum variants sizes
-//however it is improbable, that we will have that much accounts, that it will substantialy affect memory
+// Big difference in enum variants sizes
+// however it is improbable, that we will have that much accounts, that it will substantialy affect
+// memory
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum PersistentAccountData {
@@ -52,19 +54,19 @@ pub struct PersistentStorage {
 }
 
 impl InitialAccountData {
-    pub fn address(&self) -> nssa::Address {
+    pub fn account_id(&self) -> nssa::AccountId {
         match &self {
-            Self::Public(acc) => acc.address.parse().unwrap(),
-            Self::Private(acc) => acc.address.parse().unwrap(),
+            Self::Public(acc) => acc.account_id.parse().unwrap(),
+            Self::Private(acc) => acc.account_id.parse().unwrap(),
         }
     }
 }
 
 impl PersistentAccountData {
-    pub fn address(&self) -> nssa::Address {
+    pub fn account_id(&self) -> nssa::AccountId {
         match &self {
-            Self::Public(acc) => acc.address,
-            Self::Private(acc) => acc.address,
+            Self::Public(acc) => acc.account_id,
+            Self::Private(acc) => acc.account_id,
         }
     }
 }
@@ -113,19 +115,19 @@ pub struct GasConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WalletConfig {
-    ///Override rust log (env var logging level)
+    /// Override rust log (env var logging level)
     pub override_rust_log: Option<String>,
-    ///Sequencer URL
+    /// Sequencer URL
     pub sequencer_addr: String,
-    ///Sequencer polling duration for new blocks in milliseconds
+    /// Sequencer polling duration for new blocks in milliseconds
     pub seq_poll_timeout_millis: u64,
-    ///Sequencer polling max number of blocks
+    /// Sequencer polling max number of blocks
     pub seq_poll_max_blocks: usize,
-    ///Sequencer polling max number error retries
+    /// Sequencer polling max number error retries
     pub seq_poll_max_retries: u64,
-    ///Sequencer polling error retry delay in milliseconds
+    /// Sequencer polling error retry delay in milliseconds
     pub seq_poll_retry_delay_millis: u64,
-    ///Initial accounts for wallet
+    /// Initial accounts for wallet
     pub initial_accounts: Vec<InitialAccountData>,
 }
 
@@ -143,7 +145,7 @@ impl Default for WalletConfig {
                 [
         {
             "Public": {
-                "address": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
+                "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
                 "pub_sign_key": [
                     16,
                     162,
@@ -182,7 +184,7 @@ impl Default for WalletConfig {
         },
         {
             "Public": {
-                "address": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
+                "account_id": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
                 "pub_sign_key": [
                     113,
                     121,
@@ -221,7 +223,7 @@ impl Default for WalletConfig {
         },
         {
             "Private": {
-                "address": "3oCG8gqdKLMegw4rRfyaMQvuPHpcASt7xwttsmnZLSkw",
+                "account_id": "3oCG8gqdKLMegw4rRfyaMQvuPHpcASt7xwttsmnZLSkw",
                 "account": {
                     "program_owner": [
                         0,
@@ -450,7 +452,7 @@ impl Default for WalletConfig {
         },
         {
             "Private": {
-                "address": "AKTcXgJ1xoynta1Ec7y6Jso1z1JQtHqd7aPQ1h9er6xX",
+                "account_id": "AKTcXgJ1xoynta1Ec7y6Jso1z1JQtHqd7aPQ1h9er6xX",
                 "account": {
                     "program_owner": [
                         0,

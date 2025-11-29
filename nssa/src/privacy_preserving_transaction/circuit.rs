@@ -1,3 +1,4 @@
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
     MembershipProof, NullifierPublicKey, NullifierSecretKey, PrivacyPreservingCircuitInput,
     PrivacyPreservingCircuitOutput, SharedSecretKey,
@@ -6,12 +7,14 @@ use nssa_core::{
 };
 use risc0_zkvm::{ExecutorEnv, InnerReceipt, Receipt, default_prover};
 
-use crate::{error::NssaError, program::Program};
-
-use crate::program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID};
+use crate::{
+    error::NssaError,
+    program::Program,
+    program_methods::{PRIVACY_PRESERVING_CIRCUIT_ELF, PRIVACY_PRESERVING_CIRCUIT_ID},
+};
 
 /// Proof of the privacy preserving execution circuit
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct Proof(pub(crate) Vec<u8>);
 
 /// Generates a proof of the execution of a NSSA program inside the privacy preserving execution
@@ -95,6 +98,7 @@ mod tests {
         account::{Account, AccountId, AccountWithMetadata},
     };
 
+    use super::*;
     use crate::{
         privacy_preserving_transaction::circuit::execute_and_prove,
         program::Program,
@@ -103,8 +107,6 @@ mod tests {
             tests::{test_private_account_keys_1, test_private_account_keys_2},
         },
     };
-
-    use super::*;
 
     #[test]
     fn prove_privacy_preserving_execution_circuit_public_and_private_pre_accounts() {

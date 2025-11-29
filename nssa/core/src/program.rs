@@ -1,7 +1,7 @@
-use crate::account::{Account, AccountWithMetadata};
-use risc0_zkvm::serde::Deserializer;
-use risc0_zkvm::{DeserializeOwned, guest::env};
+use risc0_zkvm::{DeserializeOwned, guest::env, serde::Deserializer};
 use serde::{Deserialize, Serialize};
+
+use crate::account::{Account, AccountWithMetadata};
 
 pub type ProgramId = [u32; 8];
 pub type InstructionData = Vec<u32>;
@@ -17,7 +17,7 @@ pub struct ProgramInput<T> {
 pub struct ChainedCall {
     pub program_id: ProgramId,
     pub instruction_data: InstructionData,
-    pub account_indices: Vec<usize>,
+    pub pre_states: Vec<AccountWithMetadata>,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -25,7 +25,7 @@ pub struct ChainedCall {
 pub struct ProgramOutput {
     pub pre_states: Vec<AccountWithMetadata>,
     pub post_states: Vec<Account>,
-    pub chained_call: Option<ChainedCall>,
+    pub chained_calls: Vec<ChainedCall>,
 }
 
 pub fn read_nssa_inputs<T: DeserializeOwned>() -> ProgramInput<T> {
@@ -42,7 +42,7 @@ pub fn write_nssa_outputs(pre_states: Vec<AccountWithMetadata>, post_states: Vec
     let output = ProgramOutput {
         pre_states,
         post_states,
-        chained_call: None,
+        chained_calls: Vec::new(),
     };
     env::commit(&output);
 }
@@ -50,12 +50,12 @@ pub fn write_nssa_outputs(pre_states: Vec<AccountWithMetadata>, post_states: Vec
 pub fn write_nssa_outputs_with_chained_call(
     pre_states: Vec<AccountWithMetadata>,
     post_states: Vec<Account>,
-    chained_call: Option<ChainedCall>,
+    chained_calls: Vec<ChainedCall>,
 ) {
     let output = ProgramOutput {
         pre_states,
         post_states,
-        chained_call,
+        chained_calls,
     };
     env::commit(&output);
 }
@@ -103,7 +103,8 @@ pub fn validate_execution(
             return false;
         }
 
-        // 6. If a post state has default program owner, the pre state must have been a default account
+        // 6. If a post state has default program owner, the pre state must have been a default
+        //    account
         if post.program_owner == DEFAULT_PROGRAM_ID && pre.account != Account::default() {
             return false;
         }
