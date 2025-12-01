@@ -5,7 +5,7 @@ use base64::{Engine, engine::general_purpose::STANDARD as BASE64};
 use common::{
     block::HashableBlockData, sequencer_client::SequencerClient, transaction::NSSATransaction,
 };
-use key_protocol::key_protocol_core::NSSAUserData;
+use key_protocol::{key_management::key_tree::traits::KeyNode, key_protocol_core::NSSAUserData};
 use nssa::{Account, privacy_preserving_transaction::message::EncryptedAccountData};
 use nssa_core::account::Nonce;
 use rand::{RngCore, rngs::OsRng};
@@ -15,6 +15,7 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::{
     HOME_DIR_ENV_VAR, WalletCore,
     config::{
+        InitialAccountData, InitialAccountDataPrivate, InitialAccountDataPublic,
         PersistentAccountDataPrivate, PersistentAccountDataPublic, PersistentStorage, WalletConfig,
     },
 };
@@ -93,7 +94,7 @@ pub async fn fetch_config() -> Result<WalletConfig> {
 
 /// Fetch data stored at home
 ///
-/// If file not present, it is considered as empty list of persistent accounts
+/// File must be created through setup beforehand.
 pub async fn fetch_persistent_storage() -> Result<PersistentStorage> {
     let home = get_home()?;
     let accs_path = home.join("storage.json");
@@ -105,10 +106,9 @@ pub async fn fetch_persistent_storage() -> Result<PersistentStorage> {
             Ok(serde_json::from_slice(&storage_content)?)
         }
         Err(err) => match err.kind() {
-            std::io::ErrorKind::NotFound => Ok(PersistentStorage {
-                accounts: vec![],
-                last_synced_block: 0,
-            }),
+            std::io::ErrorKind::NotFound => {
+                anyhow::bail!("Not found, please setup roots from config command beforehand");
+            }
             _ => {
                 anyhow::bail!("IO error {err:#?}");
             }
@@ -123,25 +123,51 @@ pub fn produce_data_for_storage(
 ) -> PersistentStorage {
     let mut vec_for_storage = vec![];
 
-    for (account_id, key) in &user_data.pub_account_signing_keys {
-        vec_for_storage.push(
-            PersistentAccountDataPublic {
-                account_id: *account_id,
-                pub_sign_key: key.clone(),
-            }
-            .into(),
-        );
+    for (account_id, key) in &user_data.public_key_tree.account_id_map {
+        if let Some(data) = user_data.public_key_tree.key_map.get(key) {
+            vec_for_storage.push(
+                PersistentAccountDataPublic {
+                    account_id: *account_id,
+                    chain_index: key.clone(),
+                    data: data.clone(),
+                }
+                .into(),
+            );
+        }
     }
 
-    for (account_id, (key, acc)) in &user_data.user_private_accounts {
+    for (account_id, key) in &user_data.private_key_tree.account_id_map {
+        if let Some(data) = user_data.private_key_tree.key_map.get(key) {
+            vec_for_storage.push(
+                PersistentAccountDataPrivate {
+                    account_id: *account_id,
+                    chain_index: key.clone(),
+                    data: data.clone(),
+                }
+                .into(),
+            );
+        }
+    }
+
+    for (account_id, key) in &user_data.default_pub_account_signing_keys {
         vec_for_storage.push(
-            PersistentAccountDataPrivate {
-                account_id: *account_id,
-                account: acc.clone(),
-                key_chain: key.clone(),
-            }
+            InitialAccountData::Public(InitialAccountDataPublic {
+                account_id: account_id.to_string(),
+                pub_sign_key: key.clone(),
+            })
             .into(),
-        );
+        )
+    }
+
+    for (account_id, (key_chain, account)) in &user_data.default_user_private_accounts {
+        vec_for_storage.push(
+            InitialAccountData::Private(InitialAccountDataPrivate {
+                account_id: account_id.to_string(),
+                account: account.clone(),
+                key_chain: key_chain.clone(),
+            })
+            .into(),
+        )
     }
 
     PersistentStorage {
@@ -219,7 +245,7 @@ pub async fn parse_block_range(
                 let mut affected_accounts = vec![];
 
                 for (acc_account_id, (key_chain, _)) in
-                    &wallet_core.storage.user_data.user_private_accounts
+                    &wallet_core.storage.user_data.default_user_private_accounts
                 {
                     let view_tag = EncryptedAccountData::compute_view_tag(
                         key_chain.nullifer_public_key.clone(),
@@ -251,6 +277,51 @@ pub async fn parse_block_range(
                                 );
 
                                 affected_accounts.push((*acc_account_id, res_acc));
+                            }
+                        }
+                    }
+                }
+
+                for keys_node in wallet_core
+                    .storage
+                    .user_data
+                    .private_key_tree
+                    .key_map
+                    .values()
+                {
+                    let acc_account_id = keys_node.account_id();
+                    let key_chain = &keys_node.value.0;
+
+                    let view_tag = EncryptedAccountData::compute_view_tag(
+                        key_chain.nullifer_public_key.clone(),
+                        key_chain.incoming_viewing_public_key.clone(),
+                    );
+
+                    for (ciph_id, encrypted_data) in tx
+                        .message()
+                        .encrypted_private_post_states
+                        .iter()
+                        .enumerate()
+                    {
+                        if encrypted_data.view_tag == view_tag {
+                            let ciphertext = &encrypted_data.ciphertext;
+                            let commitment = &tx.message.new_commitments[ciph_id];
+                            let shared_secret = key_chain
+                                .calculate_shared_secret_receiver(encrypted_data.epk.clone());
+
+                            let res_acc = nssa_core::EncryptionScheme::decrypt(
+                                ciphertext,
+                                &shared_secret,
+                                commitment,
+                                ciph_id as u32,
+                            );
+
+                            if let Some(res_acc) = res_acc {
+                                println!(
+                                    "Received new account for account_id {acc_account_id:#?} with account object {res_acc:#?}"
+                                );
+
+                                affected_accounts.push((acc_account_id, res_acc));
                             }
                         }
                     }

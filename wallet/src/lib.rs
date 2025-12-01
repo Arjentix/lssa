@@ -9,6 +9,7 @@ use common::{
     transaction::{EncodedTransaction, NSSATransaction},
 };
 use config::WalletConfig;
+use key_protocol::key_management::key_tree::chain_index::ChainIndex;
 use log::info;
 use nssa::{Account, AccountId, PrivacyPreservingTransaction, program::Program};
 use nssa_core::{Commitment, MembershipProof, SharedSecretKey, program::InstructionData};
@@ -18,7 +19,7 @@ use tokio::io::AsyncWriteExt;
 use crate::{
     config::PersistentStorage,
     helperfunctions::{
-        fetch_persistent_storage, get_home, produce_data_for_storage, produce_random_nonces,
+        fetch_config, fetch_persistent_storage, get_home, produce_data_for_storage, produce_random_nonces
     },
     poller::TxPoller,
 };
@@ -45,21 +46,35 @@ impl WalletCore {
         let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
         let tx_poller = TxPoller::new(config.clone(), client.clone());
 
-        let mut storage = WalletChainStore::new(config)?;
-
         let PersistentStorage {
             accounts: persistent_accounts,
             last_synced_block,
         } = fetch_persistent_storage().await?;
-        for pers_acc_data in persistent_accounts {
-            storage.insert_account_data(pers_acc_data);
-        }
+
+        let storage = WalletChainStore::new(config, persistent_accounts)?;
 
         Ok(Self {
             storage,
             poller: tx_poller,
             sequencer_client: client.clone(),
             last_synced_block,
+        })
+    }
+
+    pub async fn start_from_config_new_storage(
+        config: WalletConfig,
+        password: String,
+    ) -> Result<Self> {
+        let client = Arc::new(SequencerClient::new(config.sequencer_addr.clone())?);
+        let tx_poller = TxPoller::new(config.clone(), client.clone());
+
+        let storage = WalletChainStore::new_storage(config, password)?;
+
+        Ok(Self {
+            storage,
+            poller: tx_poller,
+            sequencer_client: client.clone(),
+            last_synced_block: 0,
         })
     }
 
@@ -93,16 +108,16 @@ impl WalletCore {
         Ok(config_path)
     }
 
-    pub fn create_new_account_public(&mut self) -> AccountId {
+    pub fn create_new_account_public(&mut self, chain_index: ChainIndex) -> AccountId {
         self.storage
             .user_data
-            .generate_new_public_transaction_private_key()
+            .generate_new_public_transaction_private_key(chain_index)
     }
 
-    pub fn create_new_account_private(&mut self) -> AccountId {
+    pub fn create_new_account_private(&mut self, chain_index: ChainIndex) -> AccountId {
         self.storage
             .user_data
-            .generate_new_privacy_preserving_transaction_key_chain()
+            .generate_new_privacy_preserving_transaction_key_chain(chain_index)
     }
 
     /// Get account balance
@@ -144,17 +159,12 @@ impl WalletCore {
     pub fn get_account_private(&self, account_id: &AccountId) -> Option<Account> {
         self.storage
             .user_data
-            .user_private_accounts
-            .get(account_id)
+            .get_private_account(account_id)
             .map(|value| value.1.clone())
     }
 
     pub fn get_private_account_commitment(&self, account_id: &AccountId) -> Option<Commitment> {
-        let (keys, account) = self
-            .storage
-            .user_data
-            .user_private_accounts
-            .get(account_id)?;
+        let (keys, account) = self.storage.user_data.get_private_account(account_id)?;
         Some(Commitment::new(&keys.nullifer_public_key, account))
     }
 
@@ -283,4 +293,13 @@ impl WalletCore {
             shared_secrets,
         ))
     }
+}
+
+pub async fn execute_setup(password: String) -> Result<()> {
+    let config = fetch_config().await?;
+    let wallet_core = WalletCore::start_from_config_new_storage(config.clone(), password).await?;
+
+    wallet_core.store_persistent_data().await?;
+
+    Ok(())
 }

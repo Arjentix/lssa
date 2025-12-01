@@ -56,6 +56,20 @@ pub enum Command {
     Config(ConfigSubcommand),
 }
 
+/// Represents overarching CLI command for a wallet with setup included
+#[derive(Debug, Subcommand, Clone)]
+#[clap(about)]
+pub enum OverCommand {
+    /// Represents CLI command for a wallet
+    #[command(subcommand)]
+    Command(Command),
+    /// Setup of a storage. Initializes rots for public and private trees from `password`.
+    Setup {
+        #[arg(short, long)]
+        password: String,
+    },
+}
+
 /// To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
 ///
 /// All account adresses must be valid 32 byte base58 strings.
@@ -70,7 +84,7 @@ pub struct Args {
     pub continuous_run: bool,
     /// Wallet command
     #[command(subcommand)]
-    pub command: Option<Command>,
+    pub command: Option<OverCommand>,
 }
 
 #[derive(Debug, Clone)]
