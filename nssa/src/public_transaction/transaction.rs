@@ -1,9 +1,9 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 
+use borsh::{BorshDeserialize, BorshSerialize};
 use nssa_core::{
-    account::{Account, AccountWithMetadata},
-    address::Address,
-    program::{DEFAULT_PROGRAM_ID, validate_execution},
+    account::{Account, AccountId, AccountWithMetadata},
+    program::{ChainedCall, DEFAULT_PROGRAM_ID, validate_execution},
 };
 use sha2::{Digest, digest::FixedOutput};
 
@@ -11,14 +11,14 @@ use crate::{
     V02State,
     error::NssaError,
     public_transaction::{Message, WitnessSet},
+    state::MAX_NUMBER_CHAINED_CALLS,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, BorshDeserialize)]
 pub struct PublicTransaction {
     message: Message,
     witness_set: WitnessSet,
 }
-const MAX_NUMBER_CHAINED_CALLS: usize = 10;
 
 impl PublicTransaction {
     pub fn new(message: Message, witness_set: WitnessSet) -> Self {
@@ -36,11 +36,11 @@ impl PublicTransaction {
         &self.witness_set
     }
 
-    pub(crate) fn signer_addresses(&self) -> Vec<Address> {
+    pub(crate) fn signer_account_ids(&self) -> Vec<AccountId> {
         self.witness_set
             .signatures_and_public_keys()
             .iter()
-            .map(|(_, public_key)| Address::from(public_key))
+            .map(|(_, public_key)| AccountId::from(public_key))
             .collect()
     }
 
@@ -54,14 +54,14 @@ impl PublicTransaction {
     pub(crate) fn validate_and_produce_public_state_diff(
         &self,
         state: &V02State,
-    ) -> Result<HashMap<Address, Account>, NssaError> {
+    ) -> Result<HashMap<AccountId, Account>, NssaError> {
         let message = self.message();
         let witness_set = self.witness_set();
 
-        // All addresses must be different
-        if message.addresses.iter().collect::<HashSet<_>>().len() != message.addresses.len() {
+        // All account_ids must be different
+        if message.account_ids.iter().collect::<HashSet<_>>().len() != message.account_ids.len() {
             return Err(NssaError::InvalidInput(
-                "Duplicate addresses found in message".into(),
+                "Duplicate account_ids found in message".into(),
             ));
         }
 
@@ -79,46 +79,68 @@ impl PublicTransaction {
             ));
         }
 
-        let signer_addresses = self.signer_addresses();
+        let signer_account_ids = self.signer_account_ids();
         // Check nonces corresponds to the current nonces on the public state.
-        for (address, nonce) in signer_addresses.iter().zip(&message.nonces) {
-            let current_nonce = state.get_account_by_address(address).nonce;
+        for (account_id, nonce) in signer_account_ids.iter().zip(&message.nonces) {
+            let current_nonce = state.get_account_by_id(account_id).nonce;
             if current_nonce != *nonce {
                 return Err(NssaError::InvalidInput("Nonce mismatch".into()));
             }
         }
 
         // Build pre_states for execution
-        let mut input_pre_states: Vec<_> = message
-            .addresses
+        let input_pre_states: Vec<_> = message
+            .account_ids
             .iter()
-            .map(|address| {
+            .map(|account_id| {
                 AccountWithMetadata::new(
-                    state.get_account_by_address(address),
-                    signer_addresses.contains(address),
-                    *address,
+                    state.get_account_by_id(account_id),
+                    signer_account_ids.contains(account_id),
+                    *account_id,
                 )
             })
             .collect();
 
-        let mut state_diff: HashMap<Address, Account> = HashMap::new();
+        let mut state_diff: HashMap<AccountId, Account> = HashMap::new();
 
-        let mut program_id = message.program_id;
-        let mut instruction_data = message.instruction_data.clone();
+        let initial_call = ChainedCall {
+            program_id: message.program_id,
+            instruction_data: message.instruction_data.clone(),
+            pre_states: input_pre_states,
+        };
 
-        for _i in 0..MAX_NUMBER_CHAINED_CALLS {
+        let mut chained_calls = VecDeque::from_iter([initial_call]);
+        let mut chain_calls_counter = 0;
+
+        while let Some(chained_call) = chained_calls.pop_front() {
+            if chain_calls_counter > MAX_NUMBER_CHAINED_CALLS {
+                return Err(NssaError::MaxChainedCallsDepthExceeded);
+            }
+
             // Check the `program_id` corresponds to a deployed program
-            let Some(program) = state.programs().get(&program_id) else {
+            let Some(program) = state.programs().get(&chained_call.program_id) else {
                 return Err(NssaError::InvalidInput("Unknown program".into()));
             };
 
-            let mut program_output = program.execute(&input_pre_states, &instruction_data)?;
+            let mut program_output =
+                program.execute(&chained_call.pre_states, &chained_call.instruction_data)?;
 
-            // This check is equivalent to checking that the program output pre_states coinicide
-            // with the values in the public state or with any modifications to those values
-            // during the chain of calls.
-            if input_pre_states != program_output.pre_states {
-                return Err(NssaError::InvalidProgramBehavior);
+            for pre in &program_output.pre_states {
+                let account_id = pre.account_id;
+                // Check that the program output pre_states coinicide with the values in the public
+                // state or with any modifications to those values during the chain of calls.
+                let expected_pre = state_diff
+                    .get(&account_id)
+                    .cloned()
+                    .unwrap_or_else(|| state.get_account_by_id(&account_id));
+                if pre.account != expected_pre {
+                    return Err(NssaError::InvalidProgramBehavior);
+                }
+
+                // Check that authorization flags are consistent with the provided ones
+                if pre.is_authorized && !signer_account_ids.contains(&account_id) {
+                    return Err(NssaError::InvalidProgramBehavior);
+                }
             }
 
             // Verify execution corresponds to a well-behaved program.
@@ -126,7 +148,7 @@ impl PublicTransaction {
             if !validate_execution(
                 &program_output.pre_states,
                 &program_output.post_states,
-                program_id,
+                chained_call.program_id,
             ) {
                 return Err(NssaError::InvalidProgramBehavior);
             }
@@ -134,7 +156,7 @@ impl PublicTransaction {
             // The invoked program claims the accounts with default program id.
             for post in program_output.post_states.iter_mut() {
                 if post.program_owner == DEFAULT_PROGRAM_ID {
-                    post.program_owner = program_id;
+                    post.program_owner = chained_call.program_id;
                 }
             }
 
@@ -147,37 +169,11 @@ impl PublicTransaction {
                 state_diff.insert(pre.account_id, post.clone());
             }
 
-            if let Some(next_chained_call) = program_output.chained_call {
-                program_id = next_chained_call.program_id;
-                instruction_data = next_chained_call.instruction_data;
+            for new_call in program_output.chained_calls.into_iter().rev() {
+                chained_calls.push_front(new_call);
+            }
 
-                // Build post states with metadata for next call
-                let mut post_states_with_metadata = Vec::new();
-                for (pre, post) in program_output
-                    .pre_states
-                    .iter()
-                    .zip(program_output.post_states)
-                {
-                    let mut post_with_metadata = pre.clone();
-                    post_with_metadata.account = post.clone();
-                    post_states_with_metadata.push(post_with_metadata);
-                }
-
-                input_pre_states = next_chained_call
-                    .account_indices
-                    .iter()
-                    .map(|&i| {
-                        post_states_with_metadata
-                            .get(i)
-                            .ok_or_else(|| {
-                                NssaError::InvalidInput("Invalid account indices".into())
-                            })
-                            .cloned()
-                    })
-                    .collect::<Result<Vec<_>, NssaError>>()?;
-            } else {
-                break;
-            };
+            chain_calls_counter += 1;
         }
 
         Ok(state_diff)
@@ -189,17 +185,17 @@ pub mod tests {
     use sha2::{Digest, digest::FixedOutput};
 
     use crate::{
-        Address, PrivateKey, PublicKey, PublicTransaction, Signature, V02State,
+        AccountId, PrivateKey, PublicKey, PublicTransaction, Signature, V02State,
         error::NssaError,
         program::Program,
         public_transaction::{Message, WitnessSet},
     };
 
-    fn keys_for_tests() -> (PrivateKey, PrivateKey, Address, Address) {
+    fn keys_for_tests() -> (PrivateKey, PrivateKey, AccountId, AccountId) {
         let key1 = PrivateKey::try_new([1; 32]).unwrap();
         let key2 = PrivateKey::try_new([2; 32]).unwrap();
-        let addr1 = Address::from(&PublicKey::new_from_private_key(&key1));
-        let addr2 = Address::from(&PublicKey::new_from_private_key(&key2));
+        let addr1 = AccountId::from(&PublicKey::new_from_private_key(&key1));
+        let addr2 = AccountId::from(&PublicKey::new_from_private_key(&key2));
         (key1, key2, addr1, addr2)
     }
 
@@ -248,20 +244,20 @@ pub mod tests {
     }
 
     #[test]
-    fn test_signer_addresses() {
+    fn test_signer_account_ids() {
         let tx = transaction_for_tests();
-        let expected_signer_addresses = vec![
-            Address::new([
+        let expected_signer_account_ids = vec![
+            AccountId::new([
                 208, 122, 210, 232, 75, 39, 250, 0, 194, 98, 240, 161, 238, 160, 255, 53, 202, 9,
                 115, 84, 126, 106, 16, 111, 114, 241, 147, 194, 220, 131, 139, 68,
             ]),
-            Address::new([
+            AccountId::new([
                 231, 174, 119, 197, 239, 26, 5, 153, 147, 68, 175, 73, 159, 199, 138, 23, 5, 57,
                 141, 98, 237, 6, 207, 46, 20, 121, 246, 222, 248, 154, 57, 188,
             ]),
         ];
-        let signer_addresses = tx.signer_addresses();
-        assert_eq!(signer_addresses, expected_signer_addresses);
+        let signer_account_ids = tx.signer_account_ids();
+        assert_eq!(signer_account_ids, expected_signer_account_ids);
     }
 
     #[test]
@@ -286,7 +282,7 @@ pub mod tests {
     }
 
     #[test]
-    fn test_address_list_cant_have_duplicates() {
+    fn test_account_id_list_cant_have_duplicates() {
         let (key1, _, addr1, _) = keys_for_tests();
         let state = state_for_tests();
         let nonces = vec![0, 0];

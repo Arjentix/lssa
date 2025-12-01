@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
 
 use anyhow::Result;
 use key_protocol::{
@@ -36,7 +36,7 @@ impl WalletChainStore {
                 _ => false,
             })
             .cloned()
-            .unwrap();
+            .expect("Malformed persistent account data, must have public root");
 
         let private_root = persistent_accounts
             .iter()
@@ -45,7 +45,7 @@ impl WalletChainStore {
                 _ => false,
             })
             .cloned()
-            .unwrap();
+            .expect("Malformed persistent account data, must have private root");
 
         let mut public_tree = KeyTreePublic::new_from_root(match public_root {
             PersistentAccountData::Public(data) => data.data,
@@ -59,18 +59,18 @@ impl WalletChainStore {
         for pers_acc_data in persistent_accounts {
             match pers_acc_data {
                 PersistentAccountData::Public(data) => {
-                    public_tree.insert(data.address, data.chain_index, data.data);
+                    public_tree.insert(data.account_id, data.chain_index, data.data);
                 }
                 PersistentAccountData::Private(data) => {
-                    private_tree.insert(data.address, data.chain_index, data.data);
+                    private_tree.insert(data.account_id, data.chain_index, data.data);
                 }
                 PersistentAccountData::Preconfigured(acc_data) => match acc_data {
                     InitialAccountData::Public(data) => {
-                        public_init_acc_map.insert(data.address.parse()?, data.pub_sign_key);
+                        public_init_acc_map.insert(data.account_id.parse()?, data.pub_sign_key);
                     }
                     InitialAccountData::Private(data) => {
                         private_init_acc_map
-                            .insert(data.address.parse()?, (data.key_chain, data.account));
+                            .insert(data.account_id.parse()?, (data.key_chain, data.account));
                     }
                 },
             }
@@ -94,7 +94,7 @@ impl WalletChainStore {
         for init_acc_data in config.initial_accounts.clone() {
             match init_acc_data {
                 InitialAccountData::Public(data) => {
-                    public_init_acc_map.insert(data.address.parse()?, data.pub_sign_key);
+                    public_init_acc_map.insert(data.account_id.parse()?, data.pub_sign_key);
                 }
                 InitialAccountData::Private(data) => {
                     let mut account = data.account;
@@ -102,7 +102,8 @@ impl WalletChainStore {
                     // the config. Therefore we overwrite it here on startup. Fix this when program
                     // id can be fetched from the node and queried from the wallet.
                     account.program_owner = Program::authenticated_transfer_program().id();
-                    private_init_acc_map.insert(data.address.parse()?, (data.key_chain, account));
+                    private_init_acc_map
+                        .insert(data.account_id.parse()?, (data.key_chain, account));
                 }
             }
         }
@@ -123,25 +124,22 @@ impl WalletChainStore {
 
     pub fn insert_private_account_data(
         &mut self,
-        addr: nssa::Address,
+        account_id: nssa::AccountId,
         account: nssa_core::account::Account,
     ) {
-        println!("inserting at address {}, this account {:?}", addr, account);
+        println!("inserting at address {account_id}, this account {account:?}");
 
-        if self
+        let entry = self
             .user_data
             .default_user_private_accounts
-            .contains_key(&addr)
-        {
-            self.user_data
-                .default_user_private_accounts
-                .entry(addr)
-                .and_modify(|data| data.1 = account);
-        } else {
+            .entry(account_id)
+            .and_modify(|data| data.1 = account.clone());
+
+        if matches!(entry, Entry::Vacant(_)) {
             self.user_data
                 .private_key_tree
-                .addr_map
-                .get(&addr)
+                .account_id_map
+                .get(&account_id)
                 .map(|chain_index| {
                     self.user_data
                         .private_key_tree
@@ -159,17 +157,16 @@ mod tests {
         keys_private::ChildKeysPrivate, keys_public::ChildKeysPublic, traits::KeyNode,
     };
 
+    use super::*;
     use crate::config::{
         InitialAccountData, PersistentAccountDataPrivate, PersistentAccountDataPublic,
     };
-
-    use super::*;
 
     fn create_initial_accounts() -> Vec<InitialAccountData> {
         let initial_acc1 = serde_json::from_str(
             r#"{
             "Public": {
-                "address": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
+                "account_id": "BLgCRDXYdQPMMWVHYRFGQZbgeHx9frkipa8GtpG2Syqy",
                 "pub_sign_key": [
                     16,
                     162,
@@ -212,7 +209,7 @@ mod tests {
         let initial_acc2 = serde_json::from_str(
             r#"{
             "Public": {
-                "address": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
+                "account_id": "Gj1mJy5W7J5pfmLRujmQaLfLMWidNxQ6uwnhb666ZwHw",
                 "pub_sign_key": [
                     113,
                     121,
@@ -270,27 +267,21 @@ mod tests {
     }
 
     fn create_sample_persistent_accounts() -> Vec<PersistentAccountData> {
-        let mut accs = vec![];
-
         let public_data = ChildKeysPublic::root([42; 64]);
-
-        accs.push(PersistentAccountData::Public(PersistentAccountDataPublic {
-            address: public_data.address(),
-            chain_index: ChainIndex::root(),
-            data: public_data,
-        }));
-
         let private_data = ChildKeysPrivate::root([47; 64]);
 
-        accs.push(PersistentAccountData::Private(
-            PersistentAccountDataPrivate {
-                address: private_data.address(),
+        vec![
+            PersistentAccountData::Public(PersistentAccountDataPublic {
+                account_id: public_data.account_id(),
+                chain_index: ChainIndex::root(),
+                data: public_data,
+            }),
+            PersistentAccountData::Private(PersistentAccountDataPrivate {
+                account_id: private_data.account_id(),
                 chain_index: ChainIndex::root(),
                 data: private_data,
-            },
-        ));
-
-        accs
+            }),
+        ]
     }
 
     #[test]

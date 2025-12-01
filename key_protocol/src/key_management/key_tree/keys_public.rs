@@ -7,7 +7,7 @@ pub struct ChildKeysPublic {
     pub csk: nssa::PrivateKey,
     pub cpk: nssa::PublicKey,
     pub ccc: [u8; 32],
-    ///Can be None if root
+    /// Can be [`None`] if root
     pub cci: Option<u32>,
 }
 
@@ -27,15 +27,22 @@ impl KeyNode for ChildKeysPublic {
         }
     }
 
-    fn n_th_child(&self, cci: u32) -> Self {
+    fn nth_child(&self, cci: u32) -> Self {
         let mut hash_input = vec![];
         hash_input.extend_from_slice(self.csk.value());
         hash_input.extend_from_slice(&cci.to_le_bytes());
 
         let hash_value = hmac_sha512::HMAC::mac(&hash_input, self.ccc);
 
-        let csk = nssa::PrivateKey::try_new(*hash_value.first_chunk::<32>().unwrap()).unwrap();
-        let ccc = *hash_value.last_chunk::<32>().unwrap();
+        let csk = nssa::PrivateKey::try_new(
+            *hash_value
+                .first_chunk::<32>()
+                .expect("hash_value is 64 bytes, must be safe to get first 32"),
+        )
+        .unwrap();
+        let ccc = *hash_value
+            .last_chunk::<32>()
+            .expect("hash_value is 64 bytes, must be safe to get last 32");
         let cpk = nssa::PublicKey::new_from_private_key(&csk);
 
         Self {
@@ -50,12 +57,12 @@ impl KeyNode for ChildKeysPublic {
         &self.ccc
     }
 
-    fn child_index(&self) -> &Option<u32> {
-        &self.cci
+    fn child_index(&self) -> Option<u32> {
+        self.cci
     }
 
-    fn address(&self) -> nssa::Address {
-        nssa::Address::from(&self.cpk)
+    fn account_id(&self) -> nssa::AccountId {
+        nssa::AccountId::from(&self.cpk)
     }
 }
 
@@ -72,7 +79,7 @@ mod tests {
     #[test]
     fn test_keys_deterministic_generation() {
         let root_keys = ChildKeysPublic::root([42; 64]);
-        let child_keys = root_keys.n_th_child(5);
+        let child_keys = root_keys.nth_child(5);
 
         assert_eq!(root_keys.cci, None);
         assert_eq!(child_keys.cci, Some(5));

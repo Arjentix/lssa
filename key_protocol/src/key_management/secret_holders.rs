@@ -8,23 +8,26 @@ use rand::{RngCore, rngs::OsRng};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, digest::FixedOutput};
 
+const NSSA_ENTROPY_BYTES: [u8; 32] = [0; 32];
+
 #[derive(Debug)]
-///Seed holder. Non-clonable to ensure that different holders use different seeds.
+/// Seed holder. Non-clonable to ensure that different holders use different seeds.
 /// Produces `TopSecretKeyHolder` objects.
 pub struct SeedHolder {
-    //ToDo: Needs to be vec as serde derives is not implemented for [u8; 64]
+    // ToDo: Needs to be vec as serde derives is not implemented for [u8; 64]
     pub(crate) seed: Vec<u8>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-///Secret spending key object. Can produce `PrivateKeyHolder` objects.
+/// Secret spending key object. Can produce `PrivateKeyHolder` objects.
 pub struct SecretSpendingKey(pub(crate) [u8; 32]);
 
 pub type IncomingViewingSecretKey = Scalar;
 pub type OutgoingViewingSecretKey = Scalar;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-///Private key holder. Produces public keys. Can produce address. Can produce shared secret for recepient.
+/// Private key holder. Produces public keys. Can produce account_id. Can produce shared secret for
+/// recepient.
 pub struct PrivateKeyHolder {
     pub nullifier_secret_key: NullifierSecretKey,
     pub(crate) incoming_viewing_secret_key: IncomingViewingSecretKey,
@@ -36,7 +39,8 @@ impl SeedHolder {
         let mut enthopy_bytes: [u8; 32] = [0; 32];
         OsRng.fill_bytes(&mut enthopy_bytes);
 
-        let mnemonic = Mnemonic::from_entropy(&enthopy_bytes).unwrap();
+        let mnemonic = Mnemonic::from_entropy(&enthopy_bytes)
+            .expect("Enthropy must be a multiple of 32 bytes");
         let seed_wide = mnemonic.to_seed("mnemonic");
 
         Self {
@@ -45,10 +49,8 @@ impl SeedHolder {
     }
 
     pub fn new_mnemonic(passphrase: String) -> Self {
-        //Enthropy bytes must be deterministic as well
-        let enthopy_bytes: [u8; 32] = [0; 32];
-
-        let mnemonic = Mnemonic::from_entropy(&enthopy_bytes).unwrap();
+        let mnemonic = Mnemonic::from_entropy(&NSSA_ENTROPY_BYTES)
+            .expect("Enthropy must be a multiple of 32 bytes");
         let seed_wide = mnemonic.to_seed(passphrase);
 
         Self {
@@ -63,7 +65,7 @@ impl SeedHolder {
             hash = hmac_sha512::HMAC::mac(hash, "NSSA_seed");
         }
 
-        //Safe unwrap
+        // Safe unwrap
         *hash.first_chunk::<32>().unwrap()
     }
 

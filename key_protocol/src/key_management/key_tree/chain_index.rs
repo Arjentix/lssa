@@ -17,7 +17,7 @@ impl FromStr for ChainIndex {
     type Err = ChainIndexError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if !s.starts_with("/") {
+        if !s.starts_with('/') {
             return Err(ChainIndexError::NoRootFound);
         }
 
@@ -42,19 +42,25 @@ impl FromStr for ChainIndex {
 impl Display for ChainIndex {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "/")?;
-        if *self != Self::root() {
-            for cci in &self.0[..(self.0.len() - 1)] {
-                write!(f, "{cci}/")?;
-            }
-            write!(f, "{}", self.0.last().unwrap())?;
+        for cci in &self.0[..(self.0.len().saturating_sub(1))] {
+            write!(f, "{cci}/")?;
+        }
+        if let Some(last) = self.0.last() {
+            write!(f, "{}", last)?;
         }
         Ok(())
     }
 }
 
+impl Default for ChainIndex {
+    fn default() -> Self {
+        ChainIndex::from_str("/").expect("Root parsing failure")
+    }
+}
+
 impl ChainIndex {
     pub fn root() -> Self {
-        ChainIndex::from_str("/").unwrap()
+        ChainIndex::default()
     }
 
     pub fn chain(&self) -> &[u32] {
@@ -63,7 +69,7 @@ impl ChainIndex {
 
     pub fn next_in_line(&self) -> ChainIndex {
         let mut chain = self.0.clone();
-        //ToDo: Add overflow check
+        // ToDo: Add overflow check
         if let Some(last_p) = chain.last_mut() {
             *last_p += 1
         }
@@ -71,7 +77,7 @@ impl ChainIndex {
         ChainIndex(chain)
     }
 
-    pub fn n_th_child(&self, child_id: u32) -> ChainIndex {
+    pub fn nth_child(&self, child_id: u32) -> ChainIndex {
         let mut chain = self.0.clone();
         chain.push(child_id);
 
@@ -109,6 +115,23 @@ mod tests {
     }
 
     #[test]
+    fn test_chain_id_deser_failure_no_root() {
+        let chain_index_error = ChainIndex::from_str("257").err().unwrap();
+
+        assert!(matches!(chain_index_error, ChainIndexError::NoRootFound));
+    }
+
+    #[test]
+    fn test_chain_id_deser_failure_int_parsing_failure() {
+        let chain_index_error = ChainIndex::from_str("/hello").err().unwrap();
+
+        assert!(matches!(
+            chain_index_error,
+            ChainIndexError::ParseIntError(_)
+        ));
+    }
+
+    #[test]
     fn test_chain_id_next_in_line_correct() {
         let chain_id = ChainIndex::from_str("/257").unwrap();
         let next_in_line = chain_id.next_in_line();
@@ -119,7 +142,7 @@ mod tests {
     #[test]
     fn test_chain_id_child_correct() {
         let chain_id = ChainIndex::from_str("/257").unwrap();
-        let child = chain_id.n_th_child(3);
+        let child = chain_id.nth_child(3);
 
         assert_eq!(child, ChainIndex::from_str("/257/3").unwrap());
     }

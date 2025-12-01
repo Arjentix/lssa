@@ -1,12 +1,26 @@
-use nssa_core::address::Address;
+use borsh::{BorshDeserialize, BorshSerialize};
+use nssa_core::account::AccountId;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 use crate::{PrivateKey, error::NssaError};
 
-use sha2::{Digest, Sha256};
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, BorshSerialize, Serialize, Deserialize)]
 pub struct PublicKey([u8; 32]);
+
+impl BorshDeserialize for PublicKey {
+    fn deserialize_reader<R: std::io::Read>(reader: &mut R) -> std::io::Result<Self> {
+        let mut buf = [0u8; 32];
+        reader.read_exact(&mut buf)?;
+
+        Self::try_new(buf).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "Invalid public key: not a valid point",
+            )
+        })
+    }
+}
 
 impl PublicKey {
     pub fn new_from_private_key(key: &PrivateKey) -> Self {
@@ -20,7 +34,7 @@ impl PublicKey {
         Self(value)
     }
 
-    pub(super) fn try_new(value: [u8; 32]) -> Result<Self, NssaError> {
+    pub fn try_new(value: [u8; 32]) -> Result<Self, NssaError> {
         // Check point is valid
         let _ = secp256k1::XOnlyPublicKey::from_byte_array(value)
             .map_err(|_| NssaError::InvalidPublicKey)?;
@@ -32,7 +46,7 @@ impl PublicKey {
     }
 }
 
-impl From<&PublicKey> for Address {
+impl From<&PublicKey> for AccountId {
     fn from(key: &PublicKey) -> Self {
         const PUBLIC_ACCOUNT_ID_PREFIX: &[u8; 32] = b"/NSSA/v0.2/AccountId/Public/\x00\x00\x00\x00";
 
@@ -93,5 +107,15 @@ mod test {
                 "Failed test vector at index {i}"
             );
         }
+    }
+
+    #[test]
+    fn test_correct_ser_deser_roundtrip() {
+        let pub_key = PublicKey::try_new([42; 32]).unwrap();
+
+        let pub_key_borsh_ser = borsh::to_vec(&pub_key).unwrap();
+        let pub_key_new: PublicKey = borsh::from_slice(&pub_key_borsh_ser).unwrap();
+
+        assert_eq!(pub_key, pub_key_new);
     }
 }
