@@ -1,8 +1,10 @@
 use anyhow::Result;
 use clap::{CommandFactory as _, Parser as _};
 use tokio::runtime::Builder;
-use wallet::cli::{Args, OverCommand, execute_continuous_run, execute_subcommand};
-use wallet::execute_setup;
+use wallet::{
+    cli::{Args, OverCommand, execute_continuous_run, execute_subcommand},
+    execute_setup,
+};
 
 pub const NUM_THREADS: usize = 2;
 
@@ -31,9 +33,7 @@ fn main() -> Result<()> {
                     let _output = execute_subcommand(command).await?;
                     Ok(())
                 }
-                OverCommand::Setup { password } => {
-                    Ok(execute_setup(password).await?)
-                }
+                OverCommand::Setup { password } => Ok(execute_setup(password).await?),
             }
         } else if args.continuous_run {
             Ok(execute_continuous_run().await?)

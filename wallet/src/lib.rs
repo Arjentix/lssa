@@ -19,7 +19,8 @@ use tokio::io::AsyncWriteExt;
 use crate::{
     config::PersistentStorage,
     helperfunctions::{
-        fetch_config, fetch_persistent_storage, get_home, produce_data_for_storage, produce_random_nonces
+        fetch_config, fetch_persistent_storage, get_home, produce_data_for_storage,
+        produce_random_nonces,
     },
     poller::TxPoller,
 };
