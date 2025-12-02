@@ -37,7 +37,7 @@ fn main() {
 
     write_nssa_outputs_with_chained_call(
         vec![sender_pre.clone(), receiver_pre.clone()],
-        vec![sender_pre.account, receiver_pre.account],
+        vec![sender_pre.account.into(), receiver_pre.account.into()],
         chained_call,
     );
 }

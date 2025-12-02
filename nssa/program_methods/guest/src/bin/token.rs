@@ -1,6 +1,6 @@
 use nssa_core::{
     account::{Account, AccountId, AccountWithMetadata, Data},
-    program::{ProgramInput, read_nssa_inputs, write_nssa_outputs},
+    program::{read_nssa_inputs, write_nssa_outputs, AccountPostState, ProgramInput},
 };
 
 // The token program has three functions:
@@ -112,7 +112,7 @@ impl TokenHolding {
     }
 }
 
-fn transfer(pre_states: &[AccountWithMetadata], balance_to_move: u128) -> Vec<Account> {
+fn transfer(pre_states: &[AccountWithMetadata], balance_to_move: u128) -> Vec<AccountPostState> {
     if pre_states.len() != 2 {
         panic!("Invalid number of input accounts");
     }
@@ -156,14 +156,14 @@ fn transfer(pre_states: &[AccountWithMetadata], balance_to_move: u128) -> Vec<Ac
         this
     };
 
-    vec![sender_post, recipient_post]
+    vec![sender_post.into(), recipient_post.into()]
 }
 
 fn new_definition(
     pre_states: &[AccountWithMetadata],
     name: [u8; 6],
     total_supply: u128,
-) -> Vec<Account> {
+) -> Vec<AccountPostState> {
     if pre_states.len() != 2 {
         panic!("Invalid number of input accounts");
     }
@@ -196,10 +196,10 @@ fn new_definition(
     let mut holding_target_account_post = holding_target_account.account.clone();
     holding_target_account_post.data = token_holding.into_data();
 
-    vec![definition_target_account_post, holding_target_account_post]
+    vec![definition_target_account_post.into(), holding_target_account_post.into()]
 }
 
-fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<Account> {
+fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<AccountPostState> {
     if pre_states.len() != 2 {
         panic!("Invalid number of accounts");
     }
@@ -223,7 +223,7 @@ fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<Account> {
     let mut account_to_initialize_post = account_to_initialize.account.clone();
     account_to_initialize_post.data = holding_values.into_data();
 
-    vec![definition_post, account_to_initialize_post]
+    vec![definition_post.into(), account_to_initialize_post.into()]
 }
 
 type Instruction = [u8; 23];
@@ -387,14 +387,14 @@ mod tests {
         let post_states = new_definition(&pre_states, [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe], 10);
         let [definition_account, holding_account] = post_states.try_into().ok().unwrap();
         assert_eq!(
-            definition_account.data,
+            definition_account.account.data,
             vec![
                 0, 0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0
             ]
         );
         assert_eq!(
-            holding_account.data,
+            holding_account.account.data,
             vec![
                 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -619,14 +619,14 @@ mod tests {
         let post_states = transfer(&pre_states, 11);
         let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
         assert_eq!(
-            sender_post.data,
+            sender_post.account.data,
             vec![
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ]
         );
         assert_eq!(
-            recipient_post.data,
+            recipient_post.account.data,
             vec![
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -657,9 +657,9 @@ mod tests {
         ];
         let post_states = initialize_account(&pre_states);
         let [definition, holding] = post_states.try_into().ok().unwrap();
-        assert_eq!(definition.data, pre_states[0].account.data);
+        assert_eq!(definition.account.data, pre_states[0].account.data);
         assert_eq!(
-            holding.data,
+            holding.account.data,
             vec![
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0

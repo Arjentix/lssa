@@ -14,5 +14,5 @@ fn main() {
     let mut account_post = account_pre.clone();
     account_post.program_owner = [0, 1, 2, 3, 4, 5, 6, 7];
 
-    write_nssa_outputs(vec![pre], vec![account_post]);
+    write_nssa_outputs(vec![pre], vec![account_post.into()]);
 }

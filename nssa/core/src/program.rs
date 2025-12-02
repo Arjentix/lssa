@@ -22,9 +22,32 @@ pub struct ChainedCall {
 
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
+pub struct AccountPostState {
+    pub account: Account,
+    pub claim: bool,
+}
+
+impl From<Account> for AccountPostState {
+    fn from(account: Account) -> Self {
+        AccountPostState {
+            account,
+            claim: false,
+        }
+    }
+}
+
+impl AccountPostState {
+    pub fn with_claim_request(mut self) -> Self {
+        self.claim = true;
+        self
+    }
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+#[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct ProgramOutput {
     pub pre_states: Vec<AccountWithMetadata>,
-    pub post_states: Vec<Account>,
+    pub post_states: Vec<AccountPostState>,
     pub chained_calls: Vec<ChainedCall>,
 }
 
@@ -38,7 +61,10 @@ pub fn read_nssa_inputs<T: DeserializeOwned>() -> ProgramInput<T> {
     }
 }
 
-pub fn write_nssa_outputs(pre_states: Vec<AccountWithMetadata>, post_states: Vec<Account>) {
+pub fn write_nssa_outputs(
+    pre_states: Vec<AccountWithMetadata>,
+    post_states: Vec<AccountPostState>,
+) {
     let output = ProgramOutput {
         pre_states,
         post_states,
@@ -49,7 +75,7 @@ pub fn write_nssa_outputs(pre_states: Vec<AccountWithMetadata>, post_states: Vec
 
 pub fn write_nssa_outputs_with_chained_call(
     pre_states: Vec<AccountWithMetadata>,
-    post_states: Vec<Account>,
+    post_states: Vec<AccountPostState>,
     chained_calls: Vec<ChainedCall>,
 ) {
     let output = ProgramOutput {
@@ -68,7 +94,7 @@ pub fn write_nssa_outputs_with_chained_call(
 /// - `executing_program_id`: The identifier of the program that was executed.
 pub fn validate_execution(
     pre_states: &[AccountWithMetadata],
-    post_states: &[Account],
+    post_states: &[AccountPostState],
     executing_program_id: ProgramId,
 ) -> bool {
     // 1. Lengths must match
@@ -78,25 +104,27 @@ pub fn validate_execution(
 
     for (pre, post) in pre_states.iter().zip(post_states) {
         // 2. Nonce must remain unchanged
-        if pre.account.nonce != post.nonce {
+        if pre.account.nonce != post.account.nonce {
             return false;
         }
 
         // 3. Program ownership changes are not allowed
-        if pre.account.program_owner != post.program_owner {
+        if pre.account.program_owner != post.account.program_owner {
             return false;
         }
 
         let account_program_owner = pre.account.program_owner;
 
         // 4. Decreasing balance only allowed if owned by executing program
-        if post.balance < pre.account.balance && account_program_owner != executing_program_id {
+        if post.account.balance < pre.account.balance
+            && account_program_owner != executing_program_id
+        {
             return false;
         }
 
         // 5. Data changes only allowed if owned by executing program or if account pre state has
         //    default values
-        if pre.account.data != post.data
+        if pre.account.data != post.account.data
             && pre.account != Account::default()
             && account_program_owner != executing_program_id
         {
@@ -105,17 +133,37 @@ pub fn validate_execution(
 
         // 6. If a post state has default program owner, the pre state must have been a default
         //    account
-        if post.program_owner == DEFAULT_PROGRAM_ID && pre.account != Account::default() {
+        if post.account.program_owner == DEFAULT_PROGRAM_ID && pre.account != Account::default() {
             return false;
         }
     }
 
     // 7. Total balance is preserved
     let total_balance_pre_states: u128 = pre_states.iter().map(|pre| pre.account.balance).sum();
-    let total_balance_post_states: u128 = post_states.iter().map(|post| post.balance).sum();
+    let total_balance_post_states: u128 = post_states.iter().map(|post| post.account.balance).sum();
     if total_balance_pre_states != total_balance_post_states {
         return false;
     }
 
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_account_post_state_from_account_constructor() {
+        let account = Account {
+            program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
+            balance: 1337,
+            data: vec![0xde, 0xad, 0xbe, 0xef],
+            nonce: 10,
+        };
+
+        let account_post_state: AccountPostState = account.clone().into();
+
+        assert_eq!(account, account_post_state.account);
+        assert!(!account_post_state.claim);
+    }
 }

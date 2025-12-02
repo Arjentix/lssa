@@ -155,8 +155,8 @@ impl PublicTransaction {
 
             // The invoked program claims the accounts with default program id.
             for post in program_output.post_states.iter_mut() {
-                if post.program_owner == DEFAULT_PROGRAM_ID {
-                    post.program_owner = chained_call.program_id;
+                if post.account.program_owner == DEFAULT_PROGRAM_ID {
+                    post.account.program_owner = chained_call.program_id;
                 }
             }
 
@@ -166,7 +166,7 @@ impl PublicTransaction {
                 .iter()
                 .zip(program_output.post_states.iter())
             {
-                state_diff.insert(pre.account_id, post.clone());
+                state_diff.insert(pre.account_id, post.account.clone());
             }
 
             for new_call in program_output.chained_calls.into_iter().rev() {

@@ -66,5 +66,5 @@ fn main() {
     pinata_post.data = data.next_data().to_vec();
     winner_post.balance += PRIZE;
 
-    write_nssa_outputs(vec![pinata, winner], vec![pinata_post, winner_post]);
+    write_nssa_outputs(vec![pinata, winner], vec![pinata_post.into(), winner_post.into()]);
 }

@@ -1,16 +1,16 @@
 use nssa_core::{
     account::{Account, AccountWithMetadata},
-    program::{ProgramInput, read_nssa_inputs, write_nssa_outputs},
+    program::{AccountPostState, ProgramInput, read_nssa_inputs, write_nssa_outputs},
 };
 
 /// Initializes a default account under the ownership of this program.
 /// This is achieved by a noop.
 fn initialize_account(pre_state: AccountWithMetadata) {
-    let account_to_claim = pre_state.account.clone();
+    let account_to_claim: AccountPostState = pre_state.account.clone().into();
     let is_authorized = pre_state.is_authorized;
 
     // Continue only if the account to claim has default values
-    if account_to_claim != Account::default() {
+    if account_to_claim.account != Account::default() {
         return;
     }
 
@@ -41,7 +41,10 @@ fn transfer(sender: AccountWithMetadata, recipient: AccountWithMetadata, balance
     sender_post.balance -= balance_to_move;
     recipient_post.balance += balance_to_move;
 
-    write_nssa_outputs(vec![sender, recipient], vec![sender_post, recipient_post]);
+    write_nssa_outputs(
+        vec![sender, recipient],
+        vec![sender_post.into(), recipient_post.into()],
+    );
 }
 
 /// A transfer of balance program.

@@ -12,5 +12,5 @@ fn main() {
 
     let account_pre1 = pre1.account.clone();
 
-    write_nssa_outputs(vec![pre1, pre2], vec![account_pre1]);
+    write_nssa_outputs(vec![pre1, pre2], vec![account_pre1.into()]);
 }

@@ -17,5 +17,5 @@ fn main() {
     let mut account_post = account_pre.clone();
     account_post.balance -= balance_to_burn;
 
-    write_nssa_outputs(vec![pre], vec![account_post]);
+    write_nssa_outputs(vec![pre], vec![account_post.into()]);
 }
