@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use anyhow::Result;
-use common::sequencer_client::SequencerClient;
+use common::{block::HashableBlockData, sequencer_client::SequencerClient};
 use log::{info, warn};
 
 use crate::config::WalletConfig;
@@ -65,5 +65,19 @@ impl TxPoller {
         }
 
         anyhow::bail!("Transaction not found in preconfigured amount of blocks");
+    }
+
+    pub fn poll_block_range(
+        &self,
+        range: std::ops::RangeInclusive<u64>,
+    ) -> impl futures::Stream<Item = Result<HashableBlockData>> {
+        async_stream::stream! {
+            for block_id in range {
+                let block = borsh::from_slice::<HashableBlockData>(
+                    &self.client.get_block(block_id).await?.block,
+                )?;
+                yield Ok(block);
+            }
+        }
     }
 }
