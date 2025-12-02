@@ -145,7 +145,7 @@ impl PublicTransaction {
                 // authorized by program through the PDA mechanism
                 let is_authorized = signer_account_ids.contains(&account_id)
                     || authorized_pdas.contains(&account_id);
-                if pre.is_authorized && !is_authorized {
+                if pre.is_authorized != is_authorized {
                     return Err(NssaError::InvalidProgramBehavior);
                 }
             }

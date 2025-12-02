@@ -82,25 +82,25 @@ impl TokenHolding {
 
     fn parse(data: &[u8]) -> Option<Self> {
         if data.len() != TOKEN_HOLDING_DATA_SIZE || data[0] != TOKEN_HOLDING_TYPE {
-            None
-        } else {
-            let account_type = data[0];
-            let definition_id = AccountId::new(
-                data[1..33]
-                    .try_into()
-                    .expect("Defintion ID must be 32 bytes long"),
-            );
-            let balance = u128::from_le_bytes(
-                data[33..]
-                    .try_into()
-                    .expect("balance must be 16 bytes little-endian"),
-            );
-            Some(Self {
-                definition_id,
-                balance,
-                account_type,
-            })
+            return None;
         }
+
+        let account_type = data[0];
+        let definition_id = AccountId::new(
+            data[1..33]
+                .try_into()
+                .expect("Defintion ID must be 32 bytes long"),
+        );
+        let balance = u128::from_le_bytes(
+            data[33..]
+                .try_into()
+                .expect("balance must be 16 bytes little-endian"),
+        );
+        Some(Self {
+            definition_id,
+            balance,
+            account_type,
+        })
     }
 
     fn into_data(self) -> Data {
@@ -211,7 +211,7 @@ fn initialize_account(pre_states: &[AccountWithMetadata]) -> Vec<Account> {
         panic!("Only uninitialized accounts can be initialized");
     }
 
-    // TODO: We should check that this is an account owned by the token program.
+    // TODO: #212 We should check that this is an account owned by the token program.
     // This check can't be done here since the ID of the program is known only after compiling it
     //
     // Check definition account is valid
@@ -277,7 +277,6 @@ fn main() {
 
     write_nssa_outputs(pre_states, post_states);
 }
-
 
 #[cfg(test)]
 mod tests {

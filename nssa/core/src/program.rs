@@ -14,7 +14,7 @@ pub struct ProgramInput<T> {
 
 /// A 32-byte seed used to compute a *Program-Derived AccountId* (PDA).
 ///
-/// Each program can derive up to `2^32` unique account IDs by choosing different
+/// Each program can derive up to `2^256` unique account IDs by choosing different
 /// seeds. PDAs allow programs to control namespaced account identifiers without
 /// collisions between programs.
 #[derive(Serialize, Deserialize, Clone)]
