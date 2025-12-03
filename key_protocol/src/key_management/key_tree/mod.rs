@@ -140,6 +140,12 @@ impl<N: KeyNode> KeyTree<N> {
         self.key_map.remove(&chain_index)
     }
 
+    /// Populates tree with children.
+    ///
+    /// For given `depth` adds children to a tree such that their `ChainIndex::depth(&self) <
+    /// depth`.
+    ///
+    /// Tree must be empty before start
     pub fn generate_tree_for_depth(&mut self, depth: u32) {
         let mut id_stack = vec![ChainIndex::root()];
 
@@ -157,6 +163,14 @@ impl<N: KeyNode> KeyTree<N> {
 }
 
 impl KeyTree<ChildKeysPrivate> {
+    /// Cleanup of all non-initialized accounts in a private tree
+    ///
+    /// For given `depth` checks children to a tree such that their `ChainIndex::depth(&self) <
+    /// depth`.
+    ///
+    /// If account is default, removes them.
+    ///
+    /// Chain must be parsed for accounts beforehand
     pub fn cleanup_tree_for_depth(&mut self, depth: u32) {
         let mut id_stack = vec![ChainIndex::root()];
 
@@ -180,6 +194,12 @@ impl KeyTree<ChildKeysPrivate> {
 }
 
 impl KeyTree<ChildKeysPublic> {
+    /// Cleanup of all non-initialized accounts in a public tree
+    ///
+    /// For given `depth` checks children to a tree such that their `ChainIndex::depth(&self) <
+    /// depth`.
+    ///
+    /// If account is default, removes them.
     pub async fn cleanup_tree_for_depth(
         &mut self,
         depth: u32,
