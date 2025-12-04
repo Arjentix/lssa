@@ -11,7 +11,7 @@ fn initialize_account(pre_state: AccountWithMetadata) {
     let is_authorized = pre_state.is_authorized;
 
     // Continue only if the account to claim has default values
-    if account_to_claim.account != Account::default() {
+    if account_to_claim.account() != &Account::default() {
         return;
     }
 

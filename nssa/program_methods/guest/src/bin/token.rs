@@ -402,14 +402,14 @@ mod tests {
         let post_states = new_definition(&pre_states, [0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe], 10);
         let [definition_account, holding_account] = post_states.try_into().ok().unwrap();
         assert_eq!(
-            definition_account.account.data,
+            definition_account.account().data,
             vec![
                 0, 0xca, 0xfe, 0xca, 0xfe, 0xca, 0xfe, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0
             ]
         );
         assert_eq!(
-            holding_account.account.data,
+            holding_account.account().data,
             vec![
                 1, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22,
                 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -634,14 +634,14 @@ mod tests {
         let post_states = transfer(&pre_states, 11);
         let [sender_post, recipient_post] = post_states.try_into().ok().unwrap();
         assert_eq!(
-            sender_post.account.data,
+            sender_post.account().data,
             vec![
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 26, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
             ]
         );
         assert_eq!(
-            recipient_post.account.data,
+            recipient_post.account().data,
             vec![
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 10, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
@@ -672,9 +672,9 @@ mod tests {
         ];
         let post_states = initialize_account(&pre_states);
         let [definition, holding] = post_states.try_into().ok().unwrap();
-        assert_eq!(definition.account.data, pre_states[0].account.data);
+        assert_eq!(definition.account().data, pre_states[0].account.data);
         assert_eq!(
-            holding.account.data,
+            holding.account().data,
             vec![
                 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0

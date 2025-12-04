@@ -159,8 +159,8 @@ impl PublicTransaction {
                 }
 
                 // The invoked program can only claim accounts with default program id.
-                if post.account.program_owner == DEFAULT_PROGRAM_ID {
-                    post.account.program_owner = chained_call.program_id;
+                if post.account().program_owner == DEFAULT_PROGRAM_ID {
+                    post.account_mut().program_owner = chained_call.program_id;
                 } else {
                     return Err(NssaError::InvalidProgramBehavior);
                 }
@@ -172,7 +172,7 @@ impl PublicTransaction {
                 .iter()
                 .zip(program_output.post_states.iter())
             {
-                state_diff.insert(pre.account_id, post.account.clone());
+                state_diff.insert(pre.account_id, post.account().clone());
             }
 
             for new_call in program_output.chained_calls.into_iter().rev() {

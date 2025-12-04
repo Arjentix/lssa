@@ -27,7 +27,7 @@ pub struct ChainedCall {
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct AccountPostState {
-    pub account: Account,
+    account: Account,
     claim: bool,
 }
 
@@ -55,6 +55,16 @@ impl AccountPostState {
     /// be claimed (owned) by the executing program.
     pub fn requires_claim(&self) -> bool {
         self.claim
+    }
+
+    /// Returns the underlying account
+    pub fn account(&self) -> &Account {
+        &self.account
+    }
+
+    /// Returns the underlying account
+    pub fn account_mut(&mut self) -> &mut Account {
+        &mut self.account
     }
 }
 
@@ -195,5 +205,20 @@ mod tests {
 
         assert_eq!(account, account_post_state.account);
         assert!(!account_post_state.requires_claim());
+    }
+
+    #[test]
+    fn test_post_state_account_getter() {
+        let mut account = Account {
+            program_owner: [1, 2, 3, 4, 5, 6, 7, 8],
+            balance: 1337,
+            data: vec![0xde, 0xad, 0xbe, 0xef],
+            nonce: 10,
+        };
+
+        let mut account_post_state = AccountPostState::new(account.clone());
+
+        assert_eq!(account_post_state.account(), &account);
+        assert_eq!(account_post_state.account_mut(), &mut account);
     }
 }

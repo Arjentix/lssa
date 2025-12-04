@@ -248,8 +248,8 @@ mod tests {
 
         let [sender_post, recipient_post] = program_output.post_states.try_into().unwrap();
 
-        assert_eq!(sender_post.account, expected_sender_post);
-        assert_eq!(recipient_post.account, expected_recipient_post);
+        assert_eq!(sender_post.account(), &expected_sender_post);
+        assert_eq!(recipient_post.account(), &expected_recipient_post);
     }
 
     #[test]
