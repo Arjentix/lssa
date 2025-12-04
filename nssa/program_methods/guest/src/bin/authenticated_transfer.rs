@@ -37,7 +37,7 @@ fn transfer(sender: AccountWithMetadata, recipient: AccountWithMetadata, balance
     }
 
     // Create accounts post states, with updated balances
-    let sender_post: AccountPostState = {
+    let sender_post = {
         // Modify sender's balance
         let mut sender_post_account = sender.account.clone();
         sender_post_account.balance -= balance_to_move;
