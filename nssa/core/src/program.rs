@@ -20,6 +20,10 @@ pub struct ChainedCall {
     pub pre_states: Vec<AccountWithMetadata>,
 }
 
+/// Represents the final state of an `Account` after a program execution.
+/// A post state may optionally request that the executing program
+/// becomes the owner of the account (a “claim”). This is used to signal
+/// that the program intends to take ownership of the account.
 #[derive(Serialize, Deserialize, Clone)]
 #[cfg_attr(any(feature = "host", test), derive(Debug, PartialEq, Eq))]
 pub struct AccountPostState {
@@ -28,6 +32,8 @@ pub struct AccountPostState {
 }
 
 impl AccountPostState {
+    /// Creates a post state without a claim request.
+    /// The executing program is not requesting ownership of the account.
     pub fn new(account: Account) -> Self {
         Self {
             account,
@@ -35,6 +41,9 @@ impl AccountPostState {
         }
     }
 
+    /// Creates a post state that requests ownership of the account.
+    /// This indicates that the executing program intends to claim the
+    /// account as its own and is allowed to mutate it.
     pub fn new_claimed(account: Account) -> Self {
         Self {
             account,
@@ -42,15 +51,10 @@ impl AccountPostState {
         }
     }
 
+    /// Returns `true` if this post state requests that the account
+    /// be claimed (owned) by the executing program.
     pub fn requires_claim(&self) -> bool {
         self.claim
-    }
-}
-
-impl AccountPostState {
-    pub fn with_claim_request(mut self) -> Self {
-        self.claim = true;
-        self
     }
 }
 
