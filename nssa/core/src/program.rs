@@ -1,10 +1,9 @@
 use risc0_zkvm::{DeserializeOwned, guest::env, serde::Deserializer};
 use serde::{Deserialize, Serialize};
 
-use crate::account::{Account, AccountWithMetadata};
-
 #[cfg(feature = "host")]
 use crate::account::AccountId;
+use crate::account::{Account, AccountWithMetadata};
 
 pub type ProgramId = [u32; 8];
 pub type InstructionData = Vec<u32>;
