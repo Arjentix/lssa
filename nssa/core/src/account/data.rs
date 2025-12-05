@@ -3,9 +3,6 @@ use std::ops::Deref;
 use borsh::{BorshDeserialize, BorshSerialize};
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "host")]
-use crate::error::NssaCoreError;
-
 pub const DATA_MAX_LENGTH_IN_BYTES: usize = 100 * 1024; // 100 KiB
 
 #[derive(Default, Clone, PartialEq, Eq, Serialize, BorshSerialize)]
@@ -18,7 +15,9 @@ impl Data {
     }
 
     #[cfg(feature = "host")]
-    pub fn from_cursor(cursor: &mut std::io::Cursor<&[u8]>) -> Result<Self, NssaCoreError> {
+    pub fn from_cursor(
+        cursor: &mut std::io::Cursor<&[u8]>,
+    ) -> Result<Self, crate::error::NssaCoreError> {
         use std::io::Read as _;
 
         let mut u32_bytes = [0u8; 4];
@@ -36,7 +35,7 @@ impl Data {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, Clone, Copy, PartialEq, Eq)]
 #[error("data length exceeds maximum allowed length of {DATA_MAX_LENGTH_IN_BYTES} bytes")]
 pub struct DataTooBigError;
 
