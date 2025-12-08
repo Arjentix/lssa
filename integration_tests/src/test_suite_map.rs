@@ -441,8 +441,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
     }
 
     /// This test creates a new private token using the token program. After creating the token, the
-    /// test executes a private token transfer to a new account. All accounts are owned except
-    /// definition.
+    /// test executes a private token transfer to a new account. All accounts are private owned
+    /// except definition which is public.
     #[nssa_integration_test]
     pub async fn test_success_token_program_private_owned_supply() {
         info!("########## test_success_token_program_private_owned_supply ##########");
@@ -602,8 +602,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
     }
 
-    /// This test creates a new private token using the token program. All accounts are owned except
-    /// supply.
+    /// This test creates a new private token using the token program. All accounts are private
+    /// owned except supply which is public.
     #[nssa_integration_test]
     pub async fn test_success_token_program_private_owned_definition() {
         info!("########## test_success_token_program_private_owned_definition ##########");
@@ -685,7 +685,8 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
         );
     }
 
-    /// This test creates a new private token using the token program. All accounts are owned.
+    /// This test creates a new private token using the token program. All accounts are private
+    /// owned.
     #[nssa_integration_test]
     pub async fn test_success_token_program_private_owned_definition_and_supply() {
         info!(
@@ -753,6 +754,35 @@ pub fn prepare_function_map() -> HashMap<String, TestFunction> {
             .get_private_account_commitment(&supply_account_id)
             .unwrap();
         assert!(verify_commitment_is_in_state(new_commitment2, &seq_client).await);
+
+        let definition_acc = wallet_storage
+            .get_account_private(&definition_account_id)
+            .unwrap();
+        let supply_acc = wallet_storage
+            .get_account_private(&supply_account_id)
+            .unwrap();
+
+        assert_eq!(definition_acc.program_owner, Program::token().id());
+        // The data of a token definition account has the following layout:
+        // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+        assert_eq!(
+            definition_acc.data,
+            vec![
+                0, 65, 32, 78, 65, 77, 69, 37, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+
+        assert_eq!(supply_acc.program_owner, Program::token().id());
+        // The data of a token definition account has the following layout:
+        // [ 0x00 || name (6 bytes) || total supply (little endian 16 bytes) ]
+        assert_eq!(
+            supply_acc.data,
+            vec![
+                1, 128, 101, 5, 31, 43, 36, 97, 108, 164, 92, 25, 157, 173, 5, 14, 194, 121, 239,
+                84, 19, 160, 243, 47, 193, 2, 250, 247, 232, 253, 191, 232, 173, 37, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
     }
 
     /// This test creates a new private token using the token program. After creating the token, the
