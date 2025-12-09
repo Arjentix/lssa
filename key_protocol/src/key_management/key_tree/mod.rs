@@ -126,8 +126,8 @@ impl<N: KeyNode> KeyTree<N> {
         let mut depth = 1;
 
         'outer: loop {
-            for chain_id in ChainIndex::chain_ids_at_depth(depth) {
-                if self.key_map.get(&chain_id).is_none() {
+            for chain_id in ChainIndex::chain_ids_at_depth_rev(depth) {
+                if !self.key_map.contains_key(&chain_id) {
                     break 'outer chain_id;
                 }
             }
@@ -520,13 +520,13 @@ mod tests {
 
         let mut tree = KeyTreePublic::new(&seed_holder);
 
+        for _ in 0..100 {
+            tree.generate_new_node_layered().unwrap();
+        }
+
         let next_slot = tree.find_next_slot_layered();
 
-        println!("NEXT SLOT {next_slot}");
-
-        let (acc_id, chain_id) = tree.generate_new_node_layered().unwrap();
-
-        println!("NEXT ACC {acc_id} at {chain_id}");
+        assert_eq!(next_slot, ChainIndex::from_str("/0/0/2/1").unwrap());
     }
 
     #[test]
