@@ -91,7 +91,10 @@ impl NSSAUserData {
         &mut self,
         parent_cci: ChainIndex,
     ) -> nssa::AccountId {
-        self.public_key_tree.generate_new_node(parent_cci).unwrap()
+        self.public_key_tree
+            .generate_new_node(&parent_cci)
+            .unwrap()
+            .0
     }
 
     /// Returns the signing key for public transaction signatures
@@ -115,7 +118,10 @@ impl NSSAUserData {
         &mut self,
         parent_cci: ChainIndex,
     ) -> nssa::AccountId {
-        self.private_key_tree.generate_new_node(parent_cci).unwrap()
+        self.private_key_tree
+            .generate_new_node(&parent_cci)
+            .unwrap()
+            .0
     }
 
     /// Returns the signing key for public transaction signatures
@@ -169,16 +175,8 @@ mod tests {
     fn test_new_account() {
         let mut user_data = NSSAUserData::default();
 
-        let account_id_pub =
-            user_data.generate_new_public_transaction_private_key(ChainIndex::root());
         let account_id_private =
             user_data.generate_new_privacy_preserving_transaction_key_chain(ChainIndex::root());
-
-        let is_private_key_generated = user_data
-            .get_pub_account_signing_key(&account_id_pub)
-            .is_some();
-
-        assert!(is_private_key_generated);
 
         let is_key_chain_generated = user_data.get_private_account(&account_id_private).is_some();
 

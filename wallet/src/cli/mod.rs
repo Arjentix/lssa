@@ -65,6 +65,13 @@ pub enum OverCommand {
         #[arg(short, long)]
         password: String,
     },
+    /// !!!WARNING!!! will rewrite current storage
+    RestoreKeys {
+        #[arg(short, long)]
+        password: String,
+        #[arg(short, long)]
+        depth: u32,
+    },
 }
 
 /// To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
@@ -201,6 +208,70 @@ pub async fn execute_setup_with_auth(password: String, auth: Option<String>) -> 
     let config = fetch_config().await?;
     let config = merge_auth_config(config, auth)?;
     let wallet_core = WalletCore::start_from_config_new_storage(config.clone(), password).await?;
+
+    wallet_core.store_persistent_data().await?;
+
+    Ok(())
+}
+
+pub async fn execute_keys_restoration(password: String, depth: u32) -> Result<()> {
+    execute_keys_restoration_with_auth(password, depth, None).await
+}
+
+pub async fn execute_keys_restoration_with_auth(
+    password: String,
+    depth: u32,
+    auth: Option<String>,
+) -> Result<()> {
+    let config = fetch_config().await?;
+    let config = merge_auth_config(config, auth)?;
+    let mut wallet_core =
+        WalletCore::start_from_config_new_storage(config.clone(), password.clone()).await?;
+
+    wallet_core
+        .storage
+        .user_data
+        .public_key_tree
+        .generate_tree_for_depth(depth);
+
+    println!("Public tree generated");
+
+    wallet_core
+        .storage
+        .user_data
+        .private_key_tree
+        .generate_tree_for_depth(depth);
+
+    println!("Private tree generated");
+
+    wallet_core
+        .storage
+        .user_data
+        .public_key_tree
+        .cleanup_tree_remove_uninit_layered(depth, wallet_core.sequencer_client.clone())
+        .await?;
+
+    println!("Public tree cleaned up");
+
+    let last_block = wallet_core
+        .sequencer_client
+        .get_last_block()
+        .await?
+        .last_block;
+
+    println!("Last block is {last_block}");
+
+    wallet_core.sync_to_block(last_block).await?;
+
+    println!("Private tree clean up start");
+
+    wallet_core
+        .storage
+        .user_data
+        .private_key_tree
+        .cleanup_tree_remove_uninit_layered(depth);
+
+    println!("Private tree cleaned up");
 
     wallet_core.store_persistent_data().await?;
 
