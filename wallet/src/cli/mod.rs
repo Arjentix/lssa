@@ -15,7 +15,7 @@ use crate::{
             token::TokenProgramAgnosticSubcommand,
         },
     },
-    helperfunctions::{fetch_config, fetch_persistent_storage},
+    helperfunctions::{fetch_config, fetch_persistent_storage, merge_auth_config},
 };
 
 pub mod account;
@@ -65,7 +65,7 @@ pub enum Command {
 
 /// To execute commands, env var NSSA_WALLET_HOME_DIR must be set into directory with config
 ///
-/// All account adresses must be valid 32 byte base58 strings.
+/// All account addresses must be valid 32 byte base58 strings.
 ///
 /// All account account_ids must be provided as {privacy_prefix}/{account_id},
 /// where valid options for `privacy_prefix` is `Public` and `Private`
@@ -75,6 +75,9 @@ pub struct Args {
     /// Continious run flag
     #[arg(short, long)]
     pub continuous_run: bool,
+    /// Basic authentication in the format `user` or `user:password`
+    #[arg(long)]
+    pub auth: Option<String>,
     /// Wallet command
     #[command(subcommand)]
     pub command: Option<Command>,
@@ -90,14 +93,22 @@ pub enum SubcommandReturnValue {
 }
 
 pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValue> {
+    execute_subcommand_with_auth(command, None).await
+}
+
+pub async fn execute_subcommand_with_auth(
+    command: Command,
+    auth: Option<String>,
+) -> Result<SubcommandReturnValue> {
     if fetch_persistent_storage().await.is_err() {
         println!("Persistent storage not found, need to execute setup");
 
         let password = read_password_from_stdin()?;
-        execute_setup(password).await?;
+        execute_setup_with_auth(password, auth.clone()).await?;
     }
 
     let wallet_config = fetch_config().await?;
+    let wallet_config = merge_auth_config(wallet_config, auth.clone())?;
     let mut wallet_core = WalletCore::start_from_config_update_chain(wallet_config).await?;
 
     let subcommand_ret = match command {
@@ -159,7 +170,7 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
         }
         Command::RestoreKeys { depth } => {
             let password = read_password_from_stdin()?;
-            execute_keys_restoration(password, depth).await?;
+            execute_keys_restoration_with_auth(password, depth, auth).await?;
 
             SubcommandReturnValue::Empty
         }
@@ -169,7 +180,11 @@ pub async fn execute_subcommand(command: Command) -> Result<SubcommandReturnValu
 }
 
 pub async fn execute_continuous_run() -> Result<()> {
+    execute_continuous_run_with_auth(None).await
+}
+pub async fn execute_continuous_run_with_auth(auth: Option<String>) -> Result<()> {
     let config = fetch_config().await?;
+    let config = merge_auth_config(config, auth)?;
     let mut wallet_core = WalletCore::start_from_config_update_chain(config.clone()).await?;
 
     loop {
@@ -198,7 +213,12 @@ pub fn read_password_from_stdin() -> Result<String> {
 }
 
 pub async fn execute_setup(password: String) -> Result<()> {
+    execute_setup_with_auth(password, None).await
+}
+
+pub async fn execute_setup_with_auth(password: String, auth: Option<String>) -> Result<()> {
     let config = fetch_config().await?;
+    let config = merge_auth_config(config, auth)?;
     let wallet_core = WalletCore::start_from_config_new_storage(config.clone(), password).await?;
 
     wallet_core.store_persistent_data().await?;
@@ -207,7 +227,16 @@ pub async fn execute_setup(password: String) -> Result<()> {
 }
 
 pub async fn execute_keys_restoration(password: String, depth: u32) -> Result<()> {
+    execute_keys_restoration_with_auth(password, depth, None).await
+}
+
+pub async fn execute_keys_restoration_with_auth(
+    password: String,
+    depth: u32,
+    auth: Option<String>,
+) -> Result<()> {
     let config = fetch_config().await?;
+    let config = merge_auth_config(config, auth)?;
     let mut wallet_core =
         WalletCore::start_from_config_new_storage(config.clone(), password.clone()).await?;
 
